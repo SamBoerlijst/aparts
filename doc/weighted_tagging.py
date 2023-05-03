@@ -4,7 +4,7 @@ from os import listdir
 from typing import Dict
 
 import pandas as pd
-from APT_parallel_v2 import construct_keylist
+from APT import construct_keylist
 
 """
 Functions for tagging of bytes like text files weighted by article sections
