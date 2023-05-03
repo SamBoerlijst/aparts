@@ -1,2 +1,34 @@
-# APART
-Academic PDF Automated Reference Tagging. A Python library to 1) build a set of keywords by query, 2) tag all pdf files within a folder, 3) returns the keywords to a .bib file for usage in reference managers and 4) returns .md summaries per author, article and journal for usage in markdown knowledge bases.
+# APART: Academic PDF Automated Reference Tagging. 
+
+Automated workflow to index academic articles with a personalized set of keywords. Designed to be used in combination with reference editors, and markdown-based personal knowledge management systems like obsidian and notion.
+
+#### Functionality
+- build a set of keywords by a query representative of the field of research
+- download missing pdf files using sci-hub
+- tag all pdf files within a folder irrespective of folder structure using 7 NLP algorithms 
+- return the keywords to a .bib file for use in reference managers
+- returns .md summaries per author, article and journal for use in markdown knowledge bases.
+
+#### input
+- a query representative of the field of research
+- .bib file containing the references to be indexed
+- folderpath containing article pdf files
+
+#### output
+- .bib file for indexed citations
+- .csv file containing the metadata for each citation
+- .md files per article, author and journal giving a dynnamic and interlinked overview of metadata and associated tags and (co-)authors
+
+## building a keyword list
+Collect keywords from (web of science or google scholar) csv list of titles and abstracts using 7 common NLP algorithms.
+The list may be combined those with author given tags and tags present in bib file and export as csv
+
+## tag pdf files
+
+
+## Output 
+### .bib file
+
+### Markdown summaries
+
+### csv file
