@@ -9,7 +9,11 @@ Automated workflow to index academic articles with a personalized set of keyword
 - return the keywords to a .bib file for use in reference managers
 - returns .md summaries per author, article and journal for use in markdown knowledge bases.
 
-
+#### Use cases
+- Optimizing queries for scientific reviews
+- Article selection for scientific review
+- Indexing bilbiography
+- Node-network analysis
 
 #### input
 - a query representative of the field of research
