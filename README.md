@@ -2,25 +2,25 @@
 
 Automated workflow to index academic articles with a personalized set of keywords. Designed to be used in combination with reference editors, and markdown-based personal knowledge management systems like obsidian and notion.
 
-#### Functionality
+## Functionality
 - build a set of keywords by a query representative of the field of research
 - download missing pdf files using sci-hub
 - tag all pdf files within a folder irrespective of folder structure using 7 NLP algorithms 
 - return the keywords to a .bib file for use in reference managers
 - returns .md summaries per author, article and journal for use in markdown knowledge bases.
 
-#### Use cases
+## Use cases
 - Optimizing queries for scientific reviews
 - Article selection for scientific review
 - Indexing bilbiography
 - Node-network analysis
 
-#### input
+## input
 - a query representative of the field of research
 - .bib file containing the references to be indexed
 - folderpath containing article pdf files
 
-#### output
+## output
 - .bib file for indexed citations
 - .csv file containing the metadata for each citation
 - .md files per article, author and journal giving a dynnamic and interlinked overview of metadata and associated tags and (co-)authors
