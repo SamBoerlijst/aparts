@@ -4,10 +4,15 @@ Automated workflow to index academic articles with a personalized set of keyword
 
 ## Functionality
 - build a set of keywords by a query representative of the field of research
-- download missing pdf files using sci-hub
 - tag all pdf files within a folder irrespective of folder structure using 7 NLP algorithms 
 - return the keywords to a .bib file for use in reference managers
 - returns .md summaries per author, article and journal for use in markdown knowledge bases.
+
+#### additional functionality
+- pdf to txt conversion
+- bib to csv conversion
+- download missing pdf files using sci-hub
+
 
 ## Use cases
 - Optimizing queries for scientific reviews
@@ -15,19 +20,21 @@ Automated workflow to index academic articles with a personalized set of keyword
 - Indexing bilbiography
 - Node-network analysis
 
+
 ## input
 - a query representative of the field of research
 - .bib file containing the references to be indexed
 - folderpath containing article pdf files
 
+
 ## output
-- .bib file for indexed citations
-- .csv file containing the metadata for each citation
+- .bib file containing article metadata supplemented by tags
+- .csv file containing the metadata for each citation supplemented by tags
 - .md files per article, author and journal giving a dynnamic and interlinked overview of metadata and associated tags and (co-)authors
 
 
 ## Workflow
-#### building a keyword list
+### building a keyword list
 Collect keywords from (web of science or google scholar) csv list of titles and abstracts using 7 common NLP algorithms.
 bigram, keybert, RAKE, textrank, topicrank, TF-IDF and YAKE
 2-4 of the algorithms
@@ -38,39 +45,27 @@ optional keyword lists for statistical tests, countries, genomics, phylogenies a
 The list may be combined those with author given tags and tags present in bib file and export as csv
 
 
-#### download (missing) pdf files
-by title and author name
-
-
-#### tag pdf files
+### tag pdf files
 collect pdf files
 conversion to txt
 tagging weighted by section
 
 
-#### .bib output
-Adds tags to supplied .bib file
-
-
-#### Markdown summaries
+### Markdown summaries
 text based summaries using javascript code blocks so that the database stays dynamically updated
 
-##### Article summary
+#### Article summary
 Metadata: tags, metadata present in apa6 formatted citation, abstract
 interlinked to relevant journal and authors
 
-##### Author summary
+#### Author summary
 co-authors by frequency
 tags by frequency
 associated papers
 interlinked to relevant papers and journals
 
-##### Journal summary
+#### Journal summary
 authors by frequency
 tags by frequency
 associated papers
 interlinked to relevant papers and authors
-
-
-#### csv file
-metadata acquired from the .bib file and indexed tags per article
