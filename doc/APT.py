@@ -951,7 +951,6 @@ def construct_keylist(keylist_path:str, alternate_lists:str)->list:
     return keylist
 
 ## scan the txt files for strings contained in the keylist
-# if the taglist throws decode errors, get rid of unicode characters in the respective txt file with an ascii converter like https://onlineunicodetools.com/convert-unicode-to-ascii
 def keylist_search(TXTCorfolder="input/pdf/docs/corrected", keylist_path="input/keylist_total.csv", outputCSV="output/csv/keywords.csv", alternate_lists:str="none"):
     """
     Scans all txt files in a given folder for keywords from the supplied csv file and any alternate lists specified. The output is stored as csv with the filename as index.
@@ -1445,7 +1444,7 @@ def create_summaries(mdFolder="output/md", Article_template="input/templates/Pap
 ### complete tagging routine
 def automated_pdf_tagging(source_folder="", PDFfolder="input/pdf", TXTfolder="input/pdf/docs", TXTCorfolder="input/pdf/docs/corrected", keylist_path="input/keylist_total.csv", outputCSV="output/csv/keywords.csv", libtex_csv="input/libtex.csv", bibfile="", bibfolder ="output/bibtex", CSVtotal="output/csv/total.csv", mdFolder="output/md", Article_template="input/templates/Paper.md", Author_template="input/templates/Author.md", Journal_template="input/templates/Journal.md", alternate_lists="none") -> None:
     """
-    Complete workflow for pdf tagging. Define 1) the reference manager path containing all pdf files and 2) the path to the .bib file, 3) the number of parallel processes and alternative taglist.
+    Complete workflow for pdf tagging. Define 1) the reference manager path containing all pdf files and 2) the path to the .bib file, 3) the alternative taglist to include (defaults to "none").
 
     Parameters:
     -----------
