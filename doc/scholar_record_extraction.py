@@ -4,11 +4,12 @@ import csv, os.path
 # setup proxy to stop ip from being blocked
 pg = ProxyGenerator()
 pg.FreeProxies()
+pg.rotate = True
 scholarly.use_proxy(pg)
 
 def download_articles(search_query: str, number: int = 100, year_range: list = [2000, 2020]) -> None:
     """
-    Download article metadata to a csv based on a query. The function allows for intterruption at any time so that it is not impacted if the Google Scholar server stops responding due to the number of queries. In this case, just run the function again.
+    Download article metadata to a csv based on a query. The function allows for intterruption at any time so that the number of articles may be extended later on.
 
     Parameters:
     -----------
@@ -59,4 +60,4 @@ def download_articles(search_query: str, number: int = 100, year_range: list = [
     return
 
 if __name__ == "__main__":
-    download_articles(search_query = "Culex AND population dynamics", number = 10)
+    download_articles(search_query = "Culex AND population dynamics", number = 100)
