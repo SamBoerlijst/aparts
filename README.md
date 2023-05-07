@@ -42,8 +42,8 @@ Automated workflow to generate a tailored set of keywords and index academic art
 2. Indicate whether i) author given keywords present in the searchrecords csv and ii) existing tags in a .bib file should be included.
 3. Collect keywords from the titles and abstracts using 7 common NLP algorithms[^1]: bigram, keybert, RAKE, textrank, topicrank, TF-IDF and YAKE:
 [^1]: by default only keywords present in 2-4 of the algorithms their output are to prevent lay terms from being included.
-```
-generate_keylist(records = "input/WOSselect1.csv", bibfile = "input/pc_Library_1-5-2023.bib")
+```{python}
+generate_keylist(records = "input/records.csv", bibfile = "input/Library.bib")
 ```
 
 ### tag pdf files
@@ -57,23 +57,18 @@ generate_keylist(records = "input/WOSselect1.csv", bibfile = "input/pc_Library_1
 ```
 
 #### Markdown summaries
-text based summaries using javascript code blocks so that the database stays dynamically updated
+Text based summaries using javascript code blocks so that the database stays dynamically updated.
 
 ##### Article summary
-Metadata: tags, metadata present in apa6 formatted citation, abstract
-interlinked to relevant journal and authors
+Summary per article containing citation metadata, abstract and tags.
+Interlinked to pdf file, relevant journal and authors.
 
 ##### Author summary
-co-authors by frequency
-tags by frequency
-associated papers
-interlinked to relevant papers and journals
+Summary per author containing relevant links, co-authors by frequency, tags by frequency and associated papers.
+Interlinked to relevant co-authors, papers and journals. The interlinked records are dynamicly updated using javascript queries.
 
 ##### Journal summary
-authors by frequency
-tags by frequency
-associated papers
-interlinked to relevant papers and authors
+Summary per journal containing authors by frequency, tags by frequency and associated papers. Interlinked to relevant papers and authors. The interlinked records are dynamically updated using javascript queries.
 
 ## Commonly wondered inqueries
 **When I use the tagging functions multiple times, will articles which already have been tagged be skipped?**
@@ -92,4 +87,3 @@ interlinked to relevant papers and authors
 
 **How long will the process take?**
 - Several functions may be time consuming. The scholarly lookups for article or author might take several minutes, keyword generation about 10 minutes for 100 records and keylist_search may take about 10 minutes for 500 files. 
-
