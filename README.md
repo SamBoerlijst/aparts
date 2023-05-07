@@ -85,5 +85,9 @@ Summary per journal containing authors by frequency, tags by frequency and assoc
 
 - PDF encoding is not standardized and although this package automatically uses common decoding fixes, some articles might still return errors. In this case you may need to manually get rid of unicode characters in the respective txt file with an ascii converter like https://onlineunicodetools.com/convert-unicode-to-ascii.
 
+**I got unknown widths|multiple definitions errors during pdf2txt conversion. What happened?**
+- This happens when the contents of a pdf cannot properly be read. This may be caused by files being corrupt or consisting of scanned pages as may be the case for older pdf files.
+
 **How long will the process take?**
+
 - Several functions may be time consuming. The scholarly lookups for article or author might take several minutes, keyword generation about 10 minutes for 100 records and keylist_search may take about 10 minutes for 500 files. 
