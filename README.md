@@ -1,38 +1,39 @@
 # APART: Academic PDF Automated Reference Tagging. 
 
-Automated workflow to index academic articles with a personalized set of keywords. Designed to be used in combination with reference editors, and markdown-based personal knowledge management systems like obsidian and notion.
+Automated workflow to generate a tailored set of keywords and index academic articles. Designed to be used in combination with reference editors, and markdown-based personal knowledge management systems like obsidian and notion.
 
 ## Functionality
-- build a set of keywords by a query representative of the field of research
-- tag all pdf files within a folder irrespective of folder structure using 7 NLP algorithms 
-- return the keywords to a .bib file for use in reference managers
-- returns .md summaries per author, article and journal for use in markdown knowledge bases.
+- Import (scholarly) records using a query representative of the field of research.
+- Generate a set of keywords by processing titles and abstracts using 7 NLP algorithms.
+- Tag all pdf files within a folder irrespective of folder structure.
+- Return the keywords to a .bib file for use in reference managers, and .csv for meta-analysis.
+- Generate dynamic .md summaries per author, article and journal for use in markdown knowledge bases.
 
 #### additional functionality
-- pdf to txt conversion
-- bib to csv conversion
-- tag articles weightted by section in which each tag is found
-- download missing pdf files using sci-hub
+- Pdf to txt conversion.
+- Bib to csv conversion.
+- Tag articles weighted by section in which each tag is found.
+- Download missing pdf files using sci-hub.
 
 
 ## Use cases
-- Optimizing queries for scientific review
-- Article selection for scientific review
-- Indexing bilbiography
-- Node-network analysis
+- Optimizing queries for scientific review.
+- Article selection for scientific review.
+- Indexing bilbiography.
+- Node-network analysis.
 
 
 ## What to expect
 ### input
-- a query representative of the field of research
+- A query representative of the field of research.
 - .bib file containing the references to be indexed
-- folderpath containing article pdf files
+- Folderpath containing article pdf files.
 
 
 ### output
-- .bib file containing article metadata supplemented by tags
-- .csv file containing the metadata for each citation supplemented by tags
-- .md files per article, author and journal giving a dynnamic and interlinked overview of metadata and associated tags and (co-)authors
+- .bib file containing article metadata supplemented by tags.
+- .csv file containing the article metadata supplemented by tags.
+- .md files per article, author and journal, giving a dynnamic and interlinked overview of metadata and associated tags and (co-)authors by frequency.
 
 
 ## Workflow
