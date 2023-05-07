@@ -11,7 +11,7 @@ Automated workflow to index academic articles with a personalized set of keyword
 #### additional functionality
 - pdf to txt conversion
 - bib to csv conversion
-- tag articles weithted by section in which each tag is found
+- tag articles weightted by section in which each tag is found
 - download missing pdf files using sci-hub
 
 
@@ -22,50 +22,53 @@ Automated workflow to index academic articles with a personalized set of keyword
 - Node-network analysis
 
 
-## input
+## What to expect
+### input
 - a query representative of the field of research
 - .bib file containing the references to be indexed
 - folderpath containing article pdf files
 
 
-## output
+### output
 - .bib file containing article metadata supplemented by tags
 - .csv file containing the metadata for each citation supplemented by tags
 - .md files per article, author and journal giving a dynnamic and interlinked overview of metadata and associated tags and (co-)authors
 
 
 ## Workflow
-### building a keyword list
-Collect keywords from (web of science or google scholar) csv list of titles and abstracts using 7 common NLP algorithms.
-bigram, keybert, RAKE, textrank, topicrank, TF-IDF and YAKE
-2-4 of the algorithms
-exclude blacklist
-add from .bib
-optional keyword lists for statistical tests, countries, genomics, phylogenies and ecology
-
-The list may be combined those with author given tags and tags present in bib file and export as csv
-
+### building a keyword list:
+1. Use a query for the field of interest to download a csv of the first 200-1000 records using web of science, google scholar (scholarly script included) or pubmed (using the 3rd party publish or perish software) to use as input. 
+2. Indicate whether i) author given keywords present in the searchrecords csv and ii) existing tags in a .bib file should be included.
+3. Collect keywords from the titles and abstracts using 7 common NLP algorithms[^1]: bigram, keybert, RAKE, textrank, topicrank, TF-IDF and YAKE:
+[^1]: by default only keywords present in 2-4 of the algorithms their output are to prevent lay terms from being included.
+```
+generate_keylist(records = "input/WOSselect1.csv", bibfile = "input/pc_Library_1-5-2023.bib")
+```
 
 ### tag pdf files
-collect pdf files
-conversion to txt
-tagging weighted by section
+4. Provide a path to the pdf files that should be tagged (irrespective of subfolder structure) and the original .bib file that should be used for metadata.
+5. indicate whether additional keylists should be used[^2], tagging should be weighted by section[^3] and whether markdown summaries should be generated.
+[^2]: Options include: 'all', 'statistics', 'countries', 'genomics', 'phylogenies', 'ecology', 'culicid_genera' or any combinations thereof e.g. "statistics and countries".
+[^3]: Weighing is determined as follows: Abstract: 4, Discussion: 3, Methods|Results: 2, Introduction:1, References: 0. A custom treshold used for exlcuding tags may be assigned (defaults to '2').
+6. Convert all articles to .txt, tag them and export tags to bib/csv/md:
+```
+ automated_pdf_tagging(source_folder="C:/.../Zotero/storage", bibfile="input/pc_Library_1-5-2023.bib", alternate_lists="all", weighted = True, treshold = 5, summaries = True)
+```
 
-
-### Markdown summaries
+#### Markdown summaries
 text based summaries using javascript code blocks so that the database stays dynamically updated
 
-#### Article summary
+##### Article summary
 Metadata: tags, metadata present in apa6 formatted citation, abstract
 interlinked to relevant journal and authors
 
-#### Author summary
+##### Author summary
 co-authors by frequency
 tags by frequency
 associated papers
 interlinked to relevant papers and journals
 
-#### Journal summary
+##### Journal summary
 authors by frequency
 tags by frequency
 associated papers
