@@ -1,5 +1,4 @@
-from setuptools import find_packages
-from distutils.core import setup
+from setuptools import find_packages, setup
 
 with open("Readme.md", "r") as f:
     long_description = f.read()
