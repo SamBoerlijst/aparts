@@ -26,7 +26,7 @@ free-proxy==1.1.1
 fsspec>=2023.1.0
 future==0.18.3
 fuzzywuzzy==0.18.0
-gensim==4.3.1
+gensim>=4.2.0
 greenlet==2.0.2
 h11==0.14.0
 httpcore==0.17.0
