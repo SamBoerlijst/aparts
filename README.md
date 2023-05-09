@@ -1,4 +1,4 @@
-# aparts: Academic PDF Automated Reference Tagging System. 
+# Academic PDF Automated Reference Tagging System. 
 
 Automated workflow to generate a tailored set of keywords and index academic articles. Designed to be used in combination with reference editors, and markdown-based personal knowledge management systems like obsidian and notion.
 
