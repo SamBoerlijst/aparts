@@ -51,7 +51,7 @@ mdurl==0.1.2
 mpmath==1.3.0
 murmurhash==1.0.9
 networkx==3.1
-nlp-rake==1.0
+nlp-rake>=0.0.2
 nltk==3.8.1
 numpy==1.24.3
 outcome==1.2.0
