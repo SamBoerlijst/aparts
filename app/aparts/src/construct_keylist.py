@@ -8,7 +8,7 @@ import gensim.corpora as corpora
 import numpy as np
 import pandas as pd
 from anyascii import anyascii
-from cleantext import clean, fix_bad_unicode
+from cleantext import clean
 from fuzzywuzzy import fuzz
 from gensim import models
 from gensim.parsing.preprocessing import remove_stopwords, strip_short
@@ -141,7 +141,7 @@ def get_original_keywords(records: str, author_given_keywords: str, original_key
     author_keywords = str(dataframe[author_given_keywords].to_list())
 
     # Fix various errors
-    author_keywords = do_clean(fix_bad_unicode(author_keywords))
+    author_keywords = do_clean(author_keywords)
 
     # Convert to list
     author_keywords = clean_keywords(author_keywords)
