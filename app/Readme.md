@@ -1,6 +1,11 @@
-# aparts: Academic PDF Automated Reference Tagging System 
+![header](./app/source/images/corpus.png)
+
+# Academic PDF Automated Reference Tagging System. 
 
 Automated workflow to generate a tailored set of keywords and index academic articles. Designed to be used in combination with reference editors, and markdown-based personal knowledge management systems like obsidian and notion.
+
+
+<br>
 
 ## Functionality
 - Import (scholarly) records using a query representative of the field of research.
@@ -15,6 +20,7 @@ Automated workflow to generate a tailored set of keywords and index academic art
 - Tag articles weighted by section in which each tag is found.
 - Download missing pdf files using sci-hub.
 
+<br>
 
 ## Use cases
 - Optimizing queries for scientific review.
@@ -22,6 +28,7 @@ Automated workflow to generate a tailored set of keywords and index academic art
 - Indexing bilbiography.
 - Node-network analysis.
 
+<br>
 
 ## What to expect
 ### input
@@ -35,6 +42,7 @@ Automated workflow to generate a tailored set of keywords and index academic art
 - .csv file containing the article metadata supplemented by tags.
 - .md files per article, author and journal, giving a dynnamic and interlinked overview of metadata and associated tags and (co-)authors by frequency.
 
+<br>
 
 ## Workflow
 ### Direct dependencies
@@ -75,6 +83,13 @@ Interlinked to relevant co-authors, papers and journals. The interlinked records
 
 ##### Journal summary
 Summary per journal containing authors by frequency, tags by frequency and associated papers. Interlinked to relevant papers and authors. The interlinked records are dynamically updated using javascript queries.
+
+<br>
+
+## Documentation
+Documentation for the package can be found at the [read the docs page](https://aparts.readthedocs.io/).
+
+<br>
 
 ## Commonly wondered inqueries
 **When I use the tagging functions multiple times, will articles which already have been tagged be skipped?**
