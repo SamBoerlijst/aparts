@@ -87,7 +87,7 @@ Summary per journal containing authors by frequency, tags by frequency and assoc
 <br>
 
 ## Documentation
-Documentation for the package can be found at the [read the docs page](https://aparts.readthedocs.io/).
+Documentation for the package can be found at the [read the docs page](https://aparts.readthedocs.io/en/latest/).
 
 <br>
 
