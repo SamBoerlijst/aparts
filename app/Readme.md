@@ -1,4 +1,4 @@
-![header](./app/source/images/corpus.png)
+![header](./source/images/corpus.png)
 
 # Academic PDF Automated Reference Tagging System. 
 
