@@ -10,7 +10,7 @@ from anyascii import anyascii
 from pybtex.database import parse_file
 from PyPDF2 import PdfReader
 
-from .weighted_tagging import split_text_to_sections, count_keyword_occurrences, filter_values, weigh_keywords, denest_and_order_dict, print_nested_dict
+from aparts.src.weighted_tagging import split_text_to_sections, count_keyword_occurrences, filter_values, weigh_keywords, denest_and_order_dict, print_nested_dict
 
 """ aparts
 - Academic Pdf - Automated Reference Tagging System: extract pdf from refmanager folder, convert to lowercase utf-8 txt, index keywords from keylist and store those in csv, bib and md format
