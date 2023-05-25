@@ -1,4 +1,4 @@
-from .weighted_tagging import split_text_to_sections, print_nested_dict
+from aparts.src.weighted_tagging import split_text_to_sections, print_nested_dict
 import re
 
 def extract_references(text: str) -> dict:
