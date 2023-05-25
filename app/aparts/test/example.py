@@ -1,5 +1,5 @@
-from ..src.construct_keylist import generate_folder_structure, generate_keylist
-from ..src.APT import automated_pdf_tagging
+from src.construct_keylist import generate_folder_structure, generate_keylist
+from src.APT import automated_pdf_tagging
 
 #generate folder structure for output
 generate_folder_structure()
