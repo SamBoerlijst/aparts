@@ -19,7 +19,7 @@ methods_pattern = r"(materials(?:\s+&)?\s+)?methods\s*(.*)"
 results_pattern = r"results\s*(.*?)\s"
 discussion_pattern = r"discussion\s*(.*?)\s"
 conclusion_pattern = r"conclusion\s*(.*?)\s"
-references_pattern = r"(?<!p)references\s*(.*)"
+references_pattern = r"(?<!taxonomic )(?:taxonomic\s)?(?:references cited|references(?!\s*[A-Z][^a-z]))(?:,(?!$)|.(?!$)|.(?!\s\w)|[^.,\s])\s*([^.,\s]+)"
 
 # create dictionary of patterns and a dictionary to store the sections in
 patterns = {
@@ -67,6 +67,9 @@ def prepare_bytes_for_pattern(text: str) -> str:
     text = text.replace('\\n"', '').replace("\\''", "")
     return text
 
+def remove_typographic_line_breaks(text):
+    pattern = r'(?<=[a-zA-Z0-9])- (?=[a-zA-Z0-9])'
+    return re.sub(pattern, '', text)
 
 def extract_sections(text: str, patterns: dict = patterns, sections: dict = sections) -> dict:
     """
@@ -88,7 +91,7 @@ def extract_sections(text: str, patterns: dict = patterns, sections: dict = sect
         for m in match:
             last_match = m
         if last_match:
-            sorted_matches[last_match.start()] = section
+            sorted_matches[last_match.end()] = section
 
     last_index = len(text)
     for index in sorted(sorted_matches.keys(), reverse=True):
@@ -277,6 +280,7 @@ def split_text_to_sections(text: str) -> dict:
     string_list = [byte.decode('utf-8') for byte in text]
     text = ''.join(string_list)
     text = prepare_bytes_for_pattern(text)
+    text = remove_typographic_line_breaks(text)
     dict = extract_sections(text)
     dict = clean_end_section(dict)
     return dict

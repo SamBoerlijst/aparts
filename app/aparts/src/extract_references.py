@@ -1,46 +1,72 @@
 from aparts.src.weighted_tagging import split_text_to_sections, print_nested_dict
+from aparts.src.APT import list_filenames
 import re
 
-def extract_references(text: str) -> dict:
-    # Create a dictionary to store the metadata for each reference
-    metadata = {}
-    if text.lower().startswith("references"):
-        reference_string = text[len('references'):].lstrip()
-    def split_references(text):
-        # Add a space after the doi link to separate it from the next reference
-        text = re.sub(r'(https://doi.org/\S|10+)', r'\1 ', text)
-        # Split the text into a list of references
-        references = re.split(r'(?<!https://doi\.)\d+\.', text)
-        # Remove leading and trailing whitespace from each reference
-        references = [ref.strip() for ref in references if ref.strip()]
-        return references
+def extract_references(text):
+    authorname_pattern = r"(?<!\()\b([A-Z][a-zA-Z]+,\s[A-Z](?:\.[A-Z])*(?:,\s[A-Z](?:\.[A-Z])*)*)"
+    year_pattern = r"(?:1[0-9]|20|21)\d{2}"
+    title_pattern = r"\.\s(.+?)\."
 
-    references = split_references(reference_string)
-    print(references)
-    # Loop through each reference and extract the metadata
-    for i in range(len(references)):
-        refnum = i+1
-        split_by_period = references[i].split('.')
-        split_by_bracket = references[i].split('(')
-        if len(split_by_bracket) > 1:
-            length = len(split_by_period)
-            # Extract the reference number and remove the period
-            title = references[i].split('.')[length-2] 
-            author_section = "".join(split_by_period[0:length-2])
-            author = author_section.split('(')[0]
-            year_section = split_by_bracket[1].replace(")", "")
-            year = year_section.split('.')[0]
-            metadata[refnum] = {'Authors': author, 'Year': year, 'Title': title}
-    return metadata
+    data_list = []
+
+    while True:
+        reference_data = {'Authors': [], 'Year': '', 'Title': ''}
+
+        # Find and temporarily store any number of authors before the next match of year_pattern
+        author_match = re.search(authorname_pattern, text)
+        if author_match:
+            authors = author_match.group(1)
+            reference_data['Authors'].append(authors)
+            text = text[author_match.end():]
+
+            while True:
+                # Check if the position of the next author is before the position of the next year_pattern
+                next_author_match = re.search(authorname_pattern, text)
+                next_year_match = re.search(year_pattern, text)
+                if next_author_match and next_year_match and next_author_match.start() < next_year_match.start():
+                    next_authors = next_author_match.group(1)
+                    reference_data['Authors'].append(next_authors)
+                    text = text[next_author_match.end():]
+                else:
+                    break
+        else:
+            break
+
+        # Store the match of year_pattern
+        year_match = re.search(year_pattern, text)
+        if year_match:
+            reference_data['Year'] = year_match.group()
+            text = text[year_match.end():]
+
+        # Find the first match to title_pattern and temporarily store it
+        title_match = re.search(title_pattern, text)
+        if title_match:
+            reference_data['Title'] = title_match.group(1)
+        if len(reference_data['Title']) >= 14 and re.match(r'^[A-Z][a-z]', reference_data['Title']):
+            data_list.append(reference_data)
+
+    return data_list
 
 
-def extract_references_from_file(filepath:str)->dict:
+def extract_references_from_file(filepath: str) -> dict:
+    # Loop through each reference within a file and extract the metadata
     sectiondict = split_text_to_sections(filepath)
     references = sectiondict["references"]
     ref_dict = extract_references(references)
-    print_nested_dict(ref_dict)
     return ref_dict
 
 
+def extract_references_from_folder(filepath: str) -> dict:
+    # Loop through each txt file within a folder, get references within each file and extract the metadata
+    ref_dict = {}
+    filenames = list_filenames(filepath, "*.txt")
+    for i in range(len(filenames)):
+        item_name = filenames[i]
+        item_path = f"{filepath}/{item_name}.txt"
+        item_references = extract_references_from_file(item_path)
+        ref_dict[i] = {"item": item_name, "reference": item_references}
+    return ref_dict
+
 if __name__ == "__main__":
-    extract_references_from_file("input/pdf/docs/Alberdi et al. - 2018 - Scrutinizing key steps for reliable metabarcoding .txt")
+    dict = extract_references_from_folder("C:/NLPvenv/NLP/input/pdf/docs/corrected/test")
+    print_nested_dict(dict)
