@@ -19,7 +19,7 @@ methods_pattern = r"(materials(?:\s+&)?\s+)?methods\s*(.*)"
 results_pattern = r"results\s*(.*?)\s"
 discussion_pattern = r"discussion\s*(.*?)\s"
 conclusion_pattern = r"conclusion\s*(.*?)\s"
-references_pattern = r"(?<!taxonomic )(?:taxonomic\s)?(?:references cited|references(?!\s*[A-Z][^a-z]))(?:,(?!$)|.(?!$)|.(?!\s\w)|[^.,\s])\s*([^.,\s]+)"
+references_pattern = r"(?<!taxonomic )(?:taxonomic\s)?(?:references cited|references(?!\s*[A-Z][^a-z]))(?:,(?!$)|.(?!$)|.(?!\s\w)|[^.,\s])(?![^\s]*\shttp)\s*([^.,\s]+)"
 
 # create dictionary of patterns and a dictionary to store the sections in
 patterns = {
@@ -132,6 +132,19 @@ def clean_end_section(patterns: dict = patterns, sections: dict = sections) -> d
 
 ## data processing
 def count_keyword_occurrences(section_dictionary: dict, keylist: list) -> dict:
+    """
+    Returns a dictionary of occurrence per keyword per section.
+
+    Parameters:
+    -----------
+    section_dictionary (dict): An object containing the input text split into sections.
+
+    keylist (list): List of keywords to count
+
+    Returns:
+    -----------
+    word_counts (dict): dictionary of occurrence per keyword per section.
+    """
     word_counts = {}
 
     for section_name, section_text in section_dictionary.items():
