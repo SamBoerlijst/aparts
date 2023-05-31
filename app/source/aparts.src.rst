@@ -4,8 +4,6 @@ aparts.src package
 Submodules
 ----------
 
-.. _APT:
-
 aparts.src.APT module
 ---------------------
 
@@ -13,8 +11,6 @@ aparts.src.APT module
    :members:
    :undoc-members:
    :show-inheritance:
-
-.. _construct_keylist:
 
 aparts.src.construct\_keylist module
 ------------------------------------
@@ -24,8 +20,6 @@ aparts.src.construct\_keylist module
    :undoc-members:
    :show-inheritance:
 
-.. _download_pdf:
-
 aparts.src.download\_pdf module
 -------------------------------
 
@@ -33,8 +27,6 @@ aparts.src.download\_pdf module
    :members:
    :undoc-members:
    :show-inheritance:
-
-.. _extract_references:
 
 aparts.src.extract\_references module
 -------------------------------------
@@ -44,7 +36,13 @@ aparts.src.extract\_references module
    :undoc-members:
    :show-inheritance:
 
-.. _scholar_record_extraction:
+aparts.src.graph module
+-----------------------
+
+.. automodule:: aparts.src.graph
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 aparts.src.scholar\_record\_extraction module
 ---------------------------------------------
@@ -54,7 +52,13 @@ aparts.src.scholar\_record\_extraction module
    :undoc-members:
    :show-inheritance:
 
-.. _weighted_tagging:
+aparts.src.summarization module
+-------------------------------
+
+.. automodule:: aparts.src.summarization
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 aparts.src.weighted\_tagging module
 -----------------------------------
@@ -63,23 +67,6 @@ aparts.src.weighted\_tagging module
    :members:
    :undoc-members:
    :show-inheritance:
-
-aparts.src.graph module
------------------------------------
-
-.. automodule:: aparts.src.graph
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-aparts.src.summarization module
------------------------------------
-
-.. automodule:: aparts.src.summarization
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 
 Module contents
 ---------------
