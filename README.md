@@ -19,6 +19,8 @@ Automated workflow to generate a tailored set of keywords and index academic art
 - Bib to csv conversion.
 - Tag articles weighted by section in which each tag is found.
 - Download missing pdf files using sci-hub.
+- Generate article summaries
+- Integrated node-network visualization
 
 <br>
 
