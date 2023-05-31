@@ -5,7 +5,7 @@
 
 aparts
 ==================================
-.. image:: /images/corpus.png
+.. image:: /images/graph_view.png
 
 Automated workflow to generate a tailored set of keywords and index academic articles. Designed to be used in combination with reference editors, and markdown-based personal knowledge management systems like obsidian and notion.
 
