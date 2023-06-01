@@ -14,7 +14,7 @@ from gensim import models
 from gensim.parsing.preprocessing import remove_stopwords, strip_short
 from gensim.utils import simple_preprocess
 from keybert import KeyBERT
-from nlp_rake import rake
+from nlp_rake.algorithm import Rake
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 from pke.unsupervised import TextRank, TopicRank
