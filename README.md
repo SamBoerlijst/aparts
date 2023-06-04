@@ -1,6 +1,6 @@
 ![header](./app/source/images/graph_view.png)
 
-# Academic PDF Automated Reference Tagging System. 
+# Academic PDF Automated Reference Tagging System
 
 Automated workflow to generate a tailored set of keywords and index academic articles. Designed to be used in combination with reference editors, and markdown-based personal knowledge management systems like obsidian and notion.
 
@@ -19,8 +19,10 @@ Automated workflow to generate a tailored set of keywords and index academic art
 - Bib to csv conversion.
 - Tag articles weighted by section in which each tag is found.
 - Download missing pdf files using sci-hub.
-- Generate article summaries
-- Integrated node-network visualization
+- Generate article summaries.
+- Integrated node-network visualization.
+- Query expansion by (pseudo) relevane.
+- Select articles based on tag dissimilarity.
 
 <br>
 
@@ -63,13 +65,21 @@ generate_keylist(records = "input/records.csv", bibfile = "input/Library.bib")
 ```
 
 ### tag pdf files
-4. Provide a path to the pdf files that should be tagged (irrespective of subfolder structure) and the original .bib file that should be used for metadata.
-5. indicate whether additional keylists should be used[^2], tagging should be weighted by section[^3] and whether markdown summaries should be generated.
+1. Provide a path to the pdf files that should be tagged (irrespective of subfolder structure) and the original .bib file that should be used for metadata.
+2. indicate whether additional keylists should be used[^2], tagging should be weighted by section[^3] and whether markdown summaries should be generated.
 [^2]: Options include: 'all', 'statistics', 'countries', 'genomics', 'phylogenies', 'ecology', 'culicid_genera' or any combinations thereof e.g. "statistics and countries".
 [^3]: Weighing is determined as follows: Abstract: 4, Discussion: 3, Methods|Results: 2, Introduction:1, References: 0. A custom treshold used for exlcuding tags may be assigned (defaults to '2').
-6. Convert all articles to .txt, tag them and export tags to bib/csv/md:
+3. Convert all articles to .txt, tag them and export tags to bib/csv/md:
 ```
  automated_pdf_tagging(source_folder="C:/.../Zotero/storage", bibfile="input/pc_Library_1-5-2023.bib", alternate_lists="all", weighted = True, treshold = 5, summaries = True)
+```
+
+### select articles by dissimilarity
+![selection](./app/source/images/corpus_and_selection_n30.png)
+1. Provide a path to the CSV file containing the corpus to sample from.
+2. Indicate the amount of articles that should be selected.
+```
+ subsample_from_csv(CSV_path="C:/.../output/csv/total.csv", n=30)
 ```
 
 #### Markdown summaries
