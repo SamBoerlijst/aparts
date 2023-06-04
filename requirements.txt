@@ -8,6 +8,7 @@ nlp_rake>=0.0.2
 nltk>=3.8.1
 numpy>=1.24.3
 pandas>=2.0.1
+pke @ git+https://github.com/boudinfl/pke.git#egg=pke
 pybtex>=0.24.0
 PyPDF2>=3.0.1
 python_Levenshtein>=0.21.0
