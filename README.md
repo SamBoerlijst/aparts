@@ -56,6 +56,7 @@ pip install git+https://github.com/boudinfl/pke.git
 ```
 
 ### building a keyword list:
+Collect tags by scanning titles and abstracts of about 200 articles.
 1. Use a query for the field of interest to download a csv of the first 200-1000 records using web of science, google scholar (scholarly script included) or pubmed (using the 3rd party publish or perish software) to use as input. 
 2. Indicate whether i) author given keywords present in the searchrecords csv and ii) existing tags in a .bib file should be included.
 3. Collect keywords from the titles and abstracts using 7 common NLP algorithms[^1]: bigram, keybert, RAKE, textrank, topicrank, TF-IDF and YAKE:
@@ -65,6 +66,7 @@ generate_keylist(records = "input/records.csv", bibfile = "input/Library.bib")
 ```
 
 ### tag pdf files
+Scrape pdf files and tag based on presence in the different article sections.
 1. Provide a path to the pdf files that should be tagged (irrespective of subfolder structure) and the original .bib file that should be used for metadata.
 2. indicate whether additional keylists should be used[^2], tagging should be weighted by section[^3] and whether markdown summaries should be generated.
 [^2]: Options include: 'all', 'statistics', 'countries', 'genomics', 'phylogenies', 'ecology', 'culicid_genera' or any combinations thereof e.g. "statistics and countries".
@@ -75,15 +77,17 @@ generate_keylist(records = "input/records.csv", bibfile = "input/Library.bib")
 ```
 
 ### select articles by dissimilarity
-![selection](./app/source/images/corpus_and_selection_n30.png)
+Calculate tag-based dissimilarity, amd select the most dissimilar articles. 
 1. Provide a path to the CSV file containing the corpus to sample from.
 2. Indicate the amount of articles that should be selected.
 ```
  subsample_from_csv(CSV_path="C:/.../output/csv/total.csv", n=30)
 ```
+![selection](./app/source/images/corpus_and_selection_n30.png)
+<figcaption align = "center"><b>Fig.1</b> Selected articles in blue superimposed over the corpus in red.</figcaption>
 
 #### Markdown summaries
-Text based summaries using javascript code blocks so that the database stays dynamically updated.
+Generate text based summaries using javascript code blocks so that the database stays dynamically updated.
 
 ##### Article summary
 Summary per article containing citation metadata, abstract and tags.
