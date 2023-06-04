@@ -83,7 +83,7 @@ Calculate tag-based dissimilarity, amd select the most dissimilar articles.
 ```
  subsample_from_csv(CSV_path="C:/.../output/csv/total.csv", n=30)
 ```
-![selection](./app/source/images/corpus_and_selection_n30.png)
+<img src="./app/source/images/corpus_and_selection_n30.png" width="600">
 <figcaption align = "center"><b>Fig.1</b> Selected articles in blue superimposed over the corpus in red.</figcaption>
 
 #### Markdown summaries
@@ -91,7 +91,7 @@ Generate text based summaries using javascript code blocks so that the database 
 
 ##### Article summary
 Summary per article containing citation metadata, abstract and tags.
-Interlinked to pdf file, relevant journal and authors.
+Interlinked to pdf file, relevant journal and authors. Duplicate authors due to incomplete initials etc. are prevented using levenshtein distance and keeping the longest name. 
 
 ##### Author summary
 Summary per author containing relevant links, co-authors by frequency, tags by frequency and associated papers.
@@ -99,6 +99,12 @@ Interlinked to relevant co-authors, papers and journals. The interlinked records
 
 ##### Journal summary
 Summary per journal containing authors by frequency, tags by frequency and associated papers. Interlinked to relevant papers and authors. The interlinked records are dynamically updated using javascript queries.
+
+#### Graph view
+Generate an interactive node-network using pyvis.
+
+<img src="./app/source/images/graphview.png" width="600">
+<figcaption align = "center"><b>Fig.2</b> Overview of articles in blue, authors in green, journal in pink, date in red and tags in yellow.</figcaption>
 
 <br>
 
