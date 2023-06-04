@@ -1,4 +1,4 @@
-import os
+import os, re
 
 import pandas as pd
 from pyvis.network import Network
@@ -144,6 +144,15 @@ def replace_filenames_by_title(column_name: str, dictionary: dict, CSV: str) -> 
         None
     return dictionary_fixed
 
+def extract_year(date_string):
+    """Find the year within a date by looking for four consecutive digits"""
+    pattern = r'\d{4}' 
+
+    match = re.search(pattern, date_string)
+    if match:
+        return match.group()
+    else:
+        return date_string
 
 def collect_data_from_csv(CSV: str) -> dict:
     """
@@ -171,8 +180,9 @@ def collect_data_from_csv(CSV: str) -> dict:
             keywords = keyword_string.split(" ")
             keywords = [x for x in keywords if len(x) >= 3]
             keywords = [x for x in keywords if x != 'nan']
-            year = str(row['date']).split("-")[0]
-            year = year.replace("nan", "")
+            keywords = [s.replace(',', '') for s in keywords]
+            year = str(row['date'])
+            year = extract_year(year).replace("nan", "")
             journal = str(row['journaltitle'])
             filename = row["file"]
             index = index
@@ -213,9 +223,10 @@ def parse_data_from_csv(CSV) -> tuple[dict, dict, dict, dict]:
                                "destination": item, "color": 1}}
             reference_data_tags.update(current)
         index = len(reference_data_year.items())+1
-        current = {index: {"source": source,
-                           "destination": value['year'], "color": 3}}
-        reference_data_year.update(current)
+        if value['year'] != "":
+            current = {index: {"source": source,
+                            "destination": value['year'], "color": 3}}
+            reference_data_year.update(current)
         for item in value['authorlist']:
             index = len(reference_data_authors.items())+1
             current = {index: {"source": source,
@@ -446,8 +457,8 @@ def graph_view(totalCSV: str, path: str, height: str, width: str, depth: int, co
 
     net = Network(height=height, width=width,
                   bgcolor="#222222", font_color="white", directed=True, filter_menu=True)
-    net.barnes_hut()
-    # net.force_atlas_2based(central_gravity=0.02, spring_length=60, spring_strength=0.2, overlap=1, gravity=-100)
+    #net.barnes_hut()
+    net.force_atlas_2based(central_gravity=0.02, spring_length=60, spring_strength=0.2, overlap=1, gravity=-100)
 
     # substitute filenames by titlenames
     inter_reference_dict = replace_filenames_by_title(
@@ -498,14 +509,13 @@ def graph_view(totalCSV: str, path: str, height: str, width: str, depth: int, co
     # add neighbor data to node hover data
     for node in net.nodes:
         node["value"] = len(neighbor_map[node["id"]])
-        node["title"] += " Neighbors:<br>" + \
-            "<br>".join(neighbor_map[node["id"]])
+        node["title"] += " Neighbors:<br>" + "<br>".join(neighbor_map[node["id"]])
     net.set_edge_smooth("dynamic")
-    net.show_buttons('physics')
+    #net.show_buttons('physics')
     net.show(f"{graph_name}.html", notebook=False)
     return
 
 
 if __name__ == "__main__":
-    graph_view("C:/NLPvenv/NLP/output/CSV/total.csv",
+    graph_view("C:/NLPvenv/NLP/output/CSV/test.csv",
                "C:/NLPvenv/NLP/input/pdf/docs/corrected/test", "1080px", "100%", 3, color_scheme, 'network')
