@@ -49,12 +49,6 @@ Automated workflow to generate a tailored set of keywords and index academic art
 <br>
 
 ## Workflow
-### Direct dependencies
-This package relies on the textrank and topicrank models from https://github.com/boudinfl/pke/tree/master. As pypi does not allow direct dependencies this has to be installed manually:
-```{python}
-pip install git+https://github.com/boudinfl/pke.git
-```
-
 ### building a keyword list:
 Collect tags by scanning titles and abstracts of about 200 articles.
 1. Use a query for the field of interest to download a csv of the first 200-1000 records using web of science, google scholar (scholarly script included) or pubmed (using the 3rd party publish or perish software) to use as input. 
