@@ -15,7 +15,8 @@ from gensim import models
 from gensim.parsing.preprocessing import remove_stopwords, strip_short
 from gensim.utils import simple_preprocess
 from keybert import KeyBERT
-from nlp_rake import rake
+from nlp_rake.rake import load_stop_words, build_stop_word_regex, generate_candidate_keywords, generate_candidate_keyword_scores, calculate_word_scores
+from nlp_rake.utils import split_sentences
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 from nltk.tokenize import sent_tokenize
@@ -325,15 +326,15 @@ def rake_extraction(records: str, WOScolumn: str, name: str, Rake_stoppath: str,
     text = do_clean(text)
     text = text.replace("[", "").replace("]", "").replace(
         "{", "").replace("}", "").replace("<", "").replace(">", "").replace("%", "")
-    sentenceList = rake.split_sentences(text)
-    stopwords = rake.load_stop_words(Rake_stoppath)
-    stopwordpattern = rake.build_stop_word_regex(Rake_stoppath)
-    phraseList = rake.generate_candidate_keywords(
+    sentenceList = split_sentences(text)
+    stopwords = load_stop_words(Rake_stoppath)
+    stopwordpattern = build_stop_word_regex(Rake_stoppath)
+    phraseList = generate_candidate_keywords(
         sentenceList, stopwordpattern, stopwords, max_words_length=3, min_char_length=4
     )
-    wordscores = rake.calculate_word_scores(phraseList)
+    wordscores = calculate_word_scores(phraseList)
     # output grouped scores
-    keywordcandidates = rake.generate_candidate_keyword_scores(
+    keywordcandidates = generate_candidate_keyword_scores(
         phraseList, wordscores, min_keyword_frequency=1
     )
     sortedKeywords = sorted(
