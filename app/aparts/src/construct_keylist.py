@@ -15,8 +15,7 @@ from gensim import models
 from gensim.parsing.preprocessing import remove_stopwords, strip_short
 from gensim.utils import simple_preprocess
 from keybert import KeyBERT
-from nlp_rake.rake import load_stop_words, build_stop_word_regex, generate_candidate_keywords, generate_candidate_keyword_scores, calculate_word_scores
-from nlp_rake.utils import split_sentences
+from nlp_rake import Rake
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 from nltk.tokenize import sent_tokenize
@@ -315,6 +314,19 @@ def rake_extraction(records: str, WOScolumn: str, name: str, Rake_stoppath: str,
     -----------
     None
     """
+    rake = Rake(
+        min_chars=3,
+        max_words=3,
+        min_freq=2,
+        language_code=None,  # 'en'
+        stopwords=None,  # {'and', 'of'}
+        lang_detect_threshold=50,
+        max_words_unknown_lang=2,
+        generated_stopwords_percentile=80,
+        generated_stopwords_max_len=3,
+        generated_stopwords_min_freq=2,
+    )
+    
     if name == "wos_a":
         print("generating rake tags from abstracts")
     elif name == "wos_t":
@@ -326,21 +338,9 @@ def rake_extraction(records: str, WOScolumn: str, name: str, Rake_stoppath: str,
     text = do_clean(text)
     text = text.replace("[", "").replace("]", "").replace(
         "{", "").replace("}", "").replace("<", "").replace(">", "").replace("%", "")
-    sentenceList = split_sentences(text)
-    stopwords = load_stop_words(Rake_stoppath)
-    stopwordpattern = build_stop_word_regex(Rake_stoppath)
-    phraseList = generate_candidate_keywords(
-        sentenceList, stopwordpattern, stopwords, max_words_length=3, min_char_length=4
-    )
-    wordscores = calculate_word_scores(phraseList)
-    # output grouped scores
-    keywordcandidates = generate_candidate_keyword_scores(
-        phraseList, wordscores, min_keyword_frequency=1
-    )
-    sortedKeywords = sorted(
-        iteritems(keywordcandidates), key=itemgetter(1), reverse=True
-    )
-    df = pd.DataFrame(data=sortedKeywords[0:amount], columns=[
+    
+    rake_keywords = rake.apply(text, text_for_stopwords=text)
+    df = pd.DataFrame(data=rake_keywords[0:amount], columns=[
                       "ID", "frequency"])
     df.to_csv(f"{input_folder}/rake_{name}.csv", index=False)
     return
@@ -943,10 +943,8 @@ def generate_keylist(input_folder="", records="", titlecolumn="Article Title", a
     """
     if author_given_keywords != "":
         get_original_keywords(input_folder=input_folder, records=records, author_given_keywords=author_given_keywords, original_keywords_txt=original_keywords_txt)
-    extract_tags(name="wos_t", column=titlecolumn, records=records,
-                 Rake_stoppath=Rake_stoppath, amount=amount, input_folder=input_folder)
-    extract_tags(name="wos_a", column=abstactcolumn, records=records,
-                 Rake_stoppath=Rake_stoppath, amount=amount, input_folder=input_folder)
+    extract_tags(name="wos_t", column=titlecolumn, records=records, Rake_stoppath=Rake_stoppath, amount=amount, input_folder=input_folder)
+    extract_tags(name="wos_a", column=abstactcolumn, records=records, Rake_stoppath=Rake_stoppath, amount=amount, input_folder=input_folder)
     if bibfile != "":
         import_bib(bibfile, libtex_csv)
         construct_keylist(blacklist=blacklist, author_given_keywords=author_given_keywords, input_folder=input_folder, output_name=output_name, original_keywords_txt=original_keywords_txt)
