@@ -1,6 +1,6 @@
 ![header](./source/images/graph_view.png)
 
-# Academic PDF Automated Reference Tagging System. 
+# Academic PDF Automated Reference Tagging System
 
 Automated workflow to generate a tailored set of keywords and index academic articles. Designed to be used in combination with reference editors, and markdown-based personal knowledge management systems like obsidian and notion.
 
@@ -19,6 +19,10 @@ Automated workflow to generate a tailored set of keywords and index academic art
 - Bib to csv conversion.
 - Tag articles weighted by section in which each tag is found.
 - Download missing pdf files using sci-hub.
+- Generate article summaries.
+- Integrated node-network visualization.
+- Query expansion by (pseudo) relevane.
+- Select articles based on tag dissimilarity.
 
 <br>
 
@@ -45,13 +49,8 @@ Automated workflow to generate a tailored set of keywords and index academic art
 <br>
 
 ## Workflow
-### Direct dependencies
-This package relies on the textrank and topicrank models from https://github.com/boudinfl/pke/tree/master. As pypi does not allow direct dependencies this has to be installed manually:
-```{python}
-pip install git+https://github.com/boudinfl/pke.git
-```
-
 ### building a keyword list:
+Collect tags by scanning titles and abstracts of about 200 articles.
 1. Use a query for the field of interest to download a csv of the first 200-1000 records using web of science, google scholar (scholarly script included) or pubmed (using the 3rd party publish or perish software) to use as input. 
 2. Indicate whether i) author given keywords present in the searchrecords csv and ii) existing tags in a .bib file should be included.
 3. Collect keywords from the titles and abstracts using 7 common NLP algorithms[^1]: bigram, keybert, RAKE, textrank, topicrank, TF-IDF and YAKE:
@@ -61,21 +60,32 @@ generate_keylist(records = "input/records.csv", bibfile = "input/Library.bib")
 ```
 
 ### tag pdf files
-4. Provide a path to the pdf files that should be tagged (irrespective of subfolder structure) and the original .bib file that should be used for metadata.
-5. indicate whether additional keylists should be used[^2], tagging should be weighted by section[^3] and whether markdown summaries should be generated.
+Scrape pdf files and tag based on presence in the different article sections.
+1. Provide a path to the pdf files that should be tagged (irrespective of subfolder structure) and the original .bib file that should be used for metadata.
+2. indicate whether additional keylists should be used[^2], tagging should be weighted by section[^3] and whether markdown summaries should be generated.
 [^2]: Options include: 'all', 'statistics', 'countries', 'genomics', 'phylogenies', 'ecology', 'culicid_genera' or any combinations thereof e.g. "statistics and countries".
 [^3]: Weighing is determined as follows: Abstract: 4, Discussion: 3, Methods|Results: 2, Introduction:1, References: 0. A custom treshold used for exlcuding tags may be assigned (defaults to '2').
-6. Convert all articles to .txt, tag them and export tags to bib/csv/md:
+3. Convert all articles to .txt, tag them and export tags to bib/csv/md:
 ```
  automated_pdf_tagging(source_folder="C:/.../Zotero/storage", bibfile="input/pc_Library_1-5-2023.bib", alternate_lists="all", weighted = True, treshold = 5, summaries = True)
 ```
 
+### select articles by dissimilarity
+Calculate tag-based dissimilarity, amd select the most dissimilar articles. 
+1. Provide a path to the CSV file containing the corpus to sample from.
+2. Indicate the amount of articles that should be selected.
+```
+ subsample_from_csv(CSV_path="C:/.../output/csv/total.csv", n=30)
+```
+<img src="./source/images/corpus_and_selection_n30.png" width="600">
+<figcaption align = "center"><b>Fig.1</b> Selected articles in blue superimposed over the corpus in red.</figcaption>
+
 #### Markdown summaries
-Text based summaries using javascript code blocks so that the database stays dynamically updated.
+Generate text based summaries using javascript code blocks so that the database stays dynamically updated.
 
 ##### Article summary
 Summary per article containing citation metadata, abstract and tags.
-Interlinked to pdf file, relevant journal and authors.
+Interlinked to pdf file, relevant journal and authors. Duplicate authors due to incomplete initials etc. are prevented using levenshtein distance and keeping the longest name. 
 
 ##### Author summary
 Summary per author containing relevant links, co-authors by frequency, tags by frequency and associated papers.
@@ -83,6 +93,12 @@ Interlinked to relevant co-authors, papers and journals. The interlinked records
 
 ##### Journal summary
 Summary per journal containing authors by frequency, tags by frequency and associated papers. Interlinked to relevant papers and authors. The interlinked records are dynamically updated using javascript queries.
+
+#### Graph view
+Generate an interactive node-network using pyvis.
+
+<img src="./source/images/graphview.png" width="600">
+<figcaption align = "center"><b>Fig.2</b> Overview of articles in blue, authors in green, journal in pink, date in red and tags in yellow.</figcaption>
 
 <br>
 
