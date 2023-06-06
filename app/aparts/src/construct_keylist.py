@@ -1,10 +1,11 @@
 import os
 import re
-from collections import OrderedDict
 from operator import itemgetter
 
 import gensim
 import gensim.corpora as corpora
+import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import pandas as pd
 from anyascii import anyascii
@@ -14,15 +15,14 @@ from gensim import models
 from gensim.parsing.preprocessing import remove_stopwords, strip_short
 from gensim.utils import simple_preprocess
 from keybert import KeyBERT
-from nlp_rake.algorithm import Rake
+from nlp_rake import rake
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
-from pke.unsupervised import TextRank, TopicRank
+from nltk.tokenize import sent_tokenize
 from pybtex.database import parse_file
 from pybtex.database.input import bibtex
 from six import iteritems
 from spacy import load
-from spacy.lang.en.stop_words import STOP_WORDS
 from yake import KeywordExtractor
 
 """ aparts
@@ -76,34 +76,10 @@ def do_clean(text: str) -> str:
     """
     return clean(
         text,
-        # Transliterate to closest ASCII representation
-        to_ascii=True,
-        # Lowercase text
-        lower=True,
-        # Fully strip line breaks as opposed to only normalizing them
-        no_line_breaks=False,
-        # Replace all URLs with a special token
-        no_urls=False,
-        # Replace all email addresses with a special token
-        no_emails=False,
-        # Replace all phone numbers with a special token
-        no_phone_numbers=True,
-        # Replace all numbers with a special token
-        no_numbers=False,
-        # Replace all digits with a special token
-        no_digits=False,
-        # Replace all currency symbols with a special token
-        no_currency_symbols=False,
-        # Fully remove punctuation
-        no_punct=False,
-        replace_with_url="<URL>",
-        replace_with_email="<EMAIL>",
-        replace_with_phone_number="<ACCOUNT>",
-        replace_with_number="<NUMBER>",
-        replace_with_digit="0",
-        replace_with_currency_symbol="<CUR>",
-        # Set to 'de' for German special handling
-        lang="en",
+        lowercase=True,
+        extra_spaces=False,
+        numbers=False,
+        punct=False,
     )
 
 
@@ -122,7 +98,7 @@ def clean_keywords(keywords: str) -> list:
 # collect keywords from WOS file
 
 
-def get_original_keywords(records: str, author_given_keywords: str, original_keywords_txt: str = "input/wos_original_tags.txt") -> None:
+def get_original_keywords(input_folder:str, records: str, author_given_keywords: str, original_keywords_txt: str) -> None:
     """
     Retrieves all keywords indexed by Web of Science and cleans any delimiter artifacts.
 
@@ -136,8 +112,9 @@ def get_original_keywords(records: str, author_given_keywords: str, original_key
     None
     """
     print("Collecting given tags")
-
-    dataframe = pd.read_csv(records)
+    original_keywords_txt_path = f"{input_folder}/{original_keywords_txt}.txt"
+    records_path = f"{input_folder}/{records}.csv"
+    dataframe = pd.read_csv(records_path)
     author_keywords = str(dataframe[author_given_keywords].to_list())
 
     # Fix various errors
@@ -151,16 +128,16 @@ def get_original_keywords(records: str, author_given_keywords: str, original_key
 
     wos_keywords_original = sorted(list(set(author_keywords)))
 
-    with open(original_keywords_txt, "w", encoding="utf-8") as file:
+    with open(original_keywords_txt_path, "w", encoding="utf-8") as file:
         file.write(str(wos_keywords_original))
 
-    print("Keywords collected and stored in", original_keywords_txt)
+    print("Keywords collected and stored in", original_keywords_txt_path)
 
     return
 
 
 # collect keywords using bigrams
-def bigram_extraction(records: str, WOScolumn: str, name: str, amount: int) -> None:
+def bigram_extraction(records: str, WOScolumn: str, name: str, amount: int, input_folder: str) -> None:
     """
     Determine keywords from the given column for each entry in a csv file using the bigram algorithm. 
 
@@ -264,12 +241,12 @@ def bigram_extraction(records: str, WOScolumn: str, name: str, amount: int) -> N
         df = pd.DataFrame.from_dict({"ID": myKeys, "frequency": myVal})
     df = df.sort_values(by="frequency", ascending=False)
     df = df[0:amount]
-    df.to_csv("input/bigram_" + name + ".csv", index=False)
+    df.to_csv(f"{input_folder}/bigram_{name}.csv", index=False)
     return
 
 
 # collect keywords using keybert
-def keybert_extraction(records: str, WOScolumn: str, name: str, amount: int) -> None:
+def keybert_extraction(records: str, WOScolumn: str, name: str, amount: int, input_folder: str) -> None:
     """
     Determine keywords from the given column for each entry in a csv file using the keybert algorithm. 
 
@@ -312,12 +289,12 @@ def keybert_extraction(records: str, WOScolumn: str, name: str, amount: int) -> 
     )
     for doc in keywords:
         df = pd.DataFrame(data=keywords, columns=["ID", "frequency"])
-        df.to_csv("input/keybert_" + name + ".csv", index=False)
+        df.to_csv(f"{input_folder}/keybert_{name}.csv", index=False)
     return
 
 
 # collect keywords using RAKE
-def rake_extraction(records: str, WOScolumn: str, name: str, Rake_stoppath: str, amount: int) -> None:
+def rake_extraction(records: str, WOScolumn: str, name: str, Rake_stoppath: str, amount: int, input_folder: str) -> None:
     """
     Determine keywords from the given column for each entry in a csv file using the RAKE algorithm. 
 
@@ -364,12 +341,74 @@ def rake_extraction(records: str, WOScolumn: str, name: str, Rake_stoppath: str,
     )
     df = pd.DataFrame(data=sortedKeywords[0:amount], columns=[
                       "ID", "frequency"])
-    df.to_csv("input/rake_" + name + ".csv", index=False)
+    df.to_csv(f"{input_folder}/rake_{name}.csv", index=False)
     return
 
 
 # collect keywords using textrank
-def textrank_extraction(records: str, WOScolumn: str, name: str, amount: int) -> None:
+def textrank_calculation(text: str, top_n: int = 5, n_gram: int = 3, output_graph: bool = False)-> (tuple[nx.Graph, pd.DataFrame] or pd.DataFrame):
+    """
+    Determine key-phrases from the provided text using the textrank algorithm. 
+
+    Parameters:
+    -----------
+    text (str): String of the phrases to analyse.
+
+    top_n (int): The number of key-phrases to extract.
+
+    n_gram (int): Length of the key-phrases in words
+
+    output_graph (bool): wherher or not a graph item should be returned for vidualization.
+
+    Return:
+    -----------
+    graph (nx.Graph): Graph item representing the distance among key-phrases
+
+    keyphrases (pd.DataFrame): Selected keyphrases and their frequency
+    """
+    sentences = sent_tokenize(text)
+    extractor = KeywordExtractor(n=n_gram)
+    candidate_keywords = [
+        keyword[0] for sentence in sentences for keyword in extractor.extract_keywords(sentence)]
+
+    graph = nx.Graph()
+    graph.add_nodes_from(candidate_keywords)
+    for sentence in sentences:
+        sentence_keywords = [kw for kw in candidate_keywords if kw in sentence]
+        for u in sentence_keywords:
+            for v in sentence_keywords:
+                if u != v:
+                    if graph.has_edge(u, v):
+                        graph[u][v]['weight'] += 1
+                    else:
+                        graph.add_edge(u, v, weight=1)
+
+    scores = nx.pagerank(graph)
+    top_keywords = sorted(scores, key=scores.get, reverse=True)[:top_n]
+    graph.remove_nodes_from(set(graph.nodes) - set(top_keywords))
+
+    keyphrases = pd.DataFrame({'n-gram': top_keywords, 'score': [scores[kw] for kw in top_keywords]})
+    if output_graph == True:
+        return graph, keyphrases
+    else:
+        return keyphrases
+
+def visualize_textrank_graph(graph:nx.Graph) -> None:
+    plt.figure(figsize=(12, 8))
+    pos = nx.spring_layout(graph, k=0.3, iterations=50)
+    node_sizes = [300 * graph.degree(node) for node in graph.nodes]
+    nx.draw_networkx_nodes(graph, pos, node_size=node_sizes,
+                           alpha=0.8, node_color='skyblue')
+    edge_widths = [0.1 * graph[u][v]['weight'] for u, v in graph.edges]
+    nx.draw_networkx_edges(graph, pos, width=edge_widths,
+                           alpha=0.5, edge_color='gray')
+    nx.draw_networkx_labels(graph, pos, font_size=8)
+    plt.margins(0.1)
+    plt.axis('off')
+    plt.show()
+    return None
+
+def textrank_extraction(records: str, WOScolumn: str, name: str, amount: int, input_folder: str) -> None:
     """
     Determine keywords from the given column for each entry in a csv file using the TextRank algorithm. 
 
@@ -401,154 +440,35 @@ def textrank_extraction(records: str, WOScolumn: str, name: str, amount: int) ->
     text = text.replace("[", "").replace("]", "").replace(
         "{", "").replace("}", "").replace("<", "").replace(">", "").replace("%", "")
     nlp.max_length = len(text) + 100
-    extractor = TextRank()
-    extractor.candidate_filtering(
-        minimum_length=4, maximum_word_number=3, valid_punctuation_marks="."
-    )
-    # define the set of valid Part-of-Speeches
-    pos = {"NOUN", "PROPN", "ADJ"}
-    sentences = []
-    doc = nlp(text)
-    for sent in doc.sents:
-        selected_words = []
-        for token in sent:
-            if token.pos_ in pos and token.is_stop is False:
-                selected_words.append(token)
-        sentences.append(selected_words)
-    keyphrases = pd.DataFrame(columns=["ID", "frequency"])
-
-    class TextRank4Keyword:
-        def __init__(self):
-            self.d = 0.85  # damping coefficient, usually is .85
-            self.min_diff = 1e-5  # convergence threshold
-            self.steps = 10  # iteration steps
-            self.node_weight = None  # save keywords and its weight
-
-        def set_stopwords(self, stopwords):
-            """Set stop words"""
-            for word in STOP_WORDS.union(set(stopwords)):
-                lexeme = nlp.vocab[word]
-                lexeme.is_stop = True
-
-        def sentence_segment(self, doc, candidate_pos, lower):
-            """Store those words only in cadidate_pos"""
-            sentences = []
-            for sent in doc.sents:
-                selected_words = []
-                for token in sent:
-                    # Store words only with cadidate POS tag
-                    if token.pos_ in candidate_pos and token.is_stop is False:
-                        if lower is True:
-                            selected_words.append(token.text.lower())
-                        else:
-                            selected_words.append(token.text)
-                sentences.append(selected_words)
-            return sentences
-
-        def get_vocab(self, sentences):
-            """Get all tokens"""
-            vocab = OrderedDict()
-            i = 0
-            for sentence in sentences:
-                for word in sentence:
-                    if word not in vocab:
-                        vocab[word] = i
-                        i += 1
-            return vocab
-
-        def get_token_pairs(self, window_size, sentences):
-            """Build token_pairs from windows in sentences"""
-            token_pairs = list()
-            for sentence in sentences:
-                for i, word in enumerate(sentence):
-                    for j in range(i + 1, i + window_size):
-                        if j >= len(sentence):
-                            break
-                        pair = (word, sentence[j])
-                        if pair not in token_pairs:
-                            token_pairs.append(pair)
-            return token_pairs
-
-        def symmetrize(self, a):
-            return a + a.T - np.diag(a.diagonal())
-
-        def get_matrix(self, vocab, token_pairs):
-            """Get normalized matrix"""
-            # Build matrix
-            vocab_size = len(vocab)
-            g = np.zeros((vocab_size, vocab_size), dtype="float")
-            for word1, word2 in token_pairs:
-                i, j = vocab[word1], vocab[word2]
-                g[i][j] = 1
-            # Get Symmeric matrix
-            g = self.symmetrize(g)
-            # Normalize matrix by column
-            norm = np.sum(g, axis=0)
-            g_norm = np.divide(
-                g, norm, where=norm != 0
-            )  # this is ignore the 0 element in norm
-            return g_norm
-
-        def get_keywords(self, number=30):
-            """Print top number keywords"""
-            node_weight = OrderedDict(
-                sorted(self.node_weight.items(),
-                       key=lambda t: t[1], reverse=True)
-            )
-            for i, (key, value) in enumerate(node_weight.items()):
-                keyphrases.loc[len(keyphrases.index)] = [key, value]
-                if i > number:
-                    break
-
-        def analyze(
-            self,
-            text,
-            candidate_pos=["NOUN", "PROPN"],
-            window_size=4,
-            lower=False,
-            stopwords=list(),
-        ):
-            """Main function to analyze text"""
-            # Set stop words
-            self.set_stopwords(stopwords)
-            # Pare text by spaCy
-            doc = nlp(text)
-            # Filter sentences
-            sentences = self.sentence_segment(
-                doc, candidate_pos, lower
-            )  # list of list of words
-            # Build vocabulary
-            vocab = self.get_vocab(sentences)
-            # Get token_pairs from windows
-            token_pairs = self.get_token_pairs(window_size, sentences)
-            # Get normalized matrix
-            g = self.get_matrix(vocab, token_pairs)
-            # Initionlization for weight(pagerank value)
-            pr = np.array([1] * len(vocab))
-            # Iteration
-            previous_pr = 0
-            for epoch in range(self.steps):
-                pr = (1 - self.d) + self.d * np.dot(g, pr)
-                if abs(previous_pr - sum(pr)) < self.min_diff:
-                    break
-                else:
-                    previous_pr = sum(pr)
-            # Get weight for each node
-            node_weight = dict()
-            for word, index in vocab.items():
-                node_weight[word] = pr[index]
-            self.node_weight = node_weight
-
-    tr4w = TextRank4Keyword()
-    tr4w.analyze(text, candidate_pos=[
-                 "NOUN", "PROPN"], window_size=4, lower=False)
-    tr4w.get_keywords(amount)
-    keyphrases.to_csv("input/TextR_" + name + ".csv", index=False)
+    keyphrases = textrank_calculation(text, amount, 1, False)
+    keyphrases.to_csv(f"{input_folder}/TextR_{name}.csv", index=False)
     return
 
 
 # collect keywords using topicrank
-def topicrank_extraction(records: str, WOScolumn: str, name: str, amount: int) -> None:
+def topicrank_calculation(text:str="", top_n:int=30, n_gram:int = 2) -> pd.DataFrame:
+    """
+    Determine key-phrases from the provided text using the topicrank algorithm. 
+
+    Parameters:
+    -----------
+    text (str): String of the phrases to analyse.
+
+    top_n (int): The number of key-phrases to extract.
+
+    n_gram (int): Length of the key-phrases in words
+
+    Return:
+    -----------
+    keyphrases (pd.DataFrame): Selected keyphrases and their frequency
+    """
+    extractor = KeywordExtractor(n=n_gram)
+    keywords = extractor.extract_keywords(text)
+    topicrank_keywords = [(keyword, score) for keyword, score in keywords][:top_n]
+    keyphrases = pd.DataFrame(topicrank_keywords, columns=["ID", "frequency"])
+    return keyphrases
+
+def topicrank_extraction(records: str, WOScolumn: str, name: str, amount: int, input_folder: str) -> None:
     """
     Determine keywords from the given column for each entry in a csv file using the TopicRank algorithm. 
 
@@ -580,34 +500,13 @@ def topicrank_extraction(records: str, WOScolumn: str, name: str, amount: int) -
     do_clean(text)
     text = text.replace("[", "").replace("]", "").replace(
         "{", "").replace("}", "").replace("<", "").replace(">", "").replace("%", "")
-    # define the set of valid Part-of-Speeches
-    pos = {"NOUN", "PROPN", "ADJ"}
-    sentences = []
-    # 1. create a TopicRank extractor.
-    nlp.max_length = len(text) + 100
-    extractor = TopicRank()
-
-    # 2. load the content of the document.
-    extractor.load_document(input=text, language="en",
-                            normalization=None, spacy_model=nlp)
-    # keyphrase candidate selection, in the case of TopicRank: sequences of nouns
-    # and adjectives (i.e. `(Noun|Adj)*`)
-    extractor.candidate_selection()
-    extractor.candidate_filtering(
-        minimum_length=4, maximum_word_number=2, valid_punctuation_marks="."
-    )
-    # candidate weighting, in the case of TopicRank: using a random walk algorithm
-    extractor.candidate_weighting()
-    # N-best selection, keyphrases contains the 10 highest scored candidates as (keyphrase, score) tuples
-    keyphrases = extractor.get_n_best(n=amount, redundancy_removal=True)
-    for doc in keyphrases:
-        df = pd.DataFrame(data=keyphrases, columns=["ID", "frequency"])
-        df.to_csv("input/topicR_" + name + ".csv", index=False)
+    df = topicrank_calculation(text, amount, 1)
+    df.to_csv(f"{input_folder}/topicR_{name}.csv", index=False)
     return
 
 
 # collect keywords using tf-idf
-def tf_idf_extraction(records: str, WOScolumn: str, name: str) -> None:
+def tf_idf_extraction(records: str, WOScolumn: str, name: str, input_folder: str) -> None:
     """
     Determine keywords from the given column for each entry in a csv file using the TF-IDF algorithm. 
 
@@ -654,13 +553,13 @@ def tf_idf_extraction(records: str, WOScolumn: str, name: str) -> None:
             locals()["data_{0}".format(doc)]["frequency"] > 0.01
         ]
         locals()["data_{0}".format(doc)].to_csv(
-            "input/tf-idf_" + name + ".csv", index=False
+            f"{input_folder}/tf-idf_{name}.csv", index=False
         )
     return
 
 
 # collect keywords using yake
-def yake_extraction(records: str, WOScolumn: str, name: str, amount: int) -> None:
+def yake_extraction(records: str, WOScolumn: str, name: str, amount: int, input_folder: str) -> None:
     """
     Determine keywords from the given column for each entry in a csv file using the YAKE algorithm. 
 
@@ -706,12 +605,12 @@ def yake_extraction(records: str, WOScolumn: str, name: str, amount: int) -> Non
     )
     keywords = custom_kw_extractor.extract_keywords(text)
     df = pd.DataFrame(data=keywords, columns=["ID", "frequency"])
-    df.to_csv("input/yake_" + name + ".csv", index=False)
+    df.to_csv(f"{input_folder}/yake_{name}.csv", index=False)
     return
 
 
 # import .bib file
-def import_bib(bibfile: str, libtex_csv: str) -> None:
+def import_bib(input_folder: str, bibfile: str, libtex_csv: str) -> None:
     """
     Extracts metadata for each entry in a .bib file and stores it in a csv file in the given folder.
 
@@ -728,7 +627,7 @@ def import_bib(bibfile: str, libtex_csv: str) -> None:
     """
     print("importing .bib file")
     parser = bibtex.Parser()
-    bib_data = parse_file(bibfile)
+    bib_data = parse_file(f"{input_folder}/{bibfile}.bib")
     dataset = pd.DataFrame(
         columns=[
             "entry",
@@ -784,12 +683,12 @@ def import_bib(bibfile: str, libtex_csv: str) -> None:
         dfcolumn = pd.DataFrame({str("entry"): entryname}, index=[0])
         bibdf["entry"] = dfcolumn["entry"]
         dataset = pd.concat([dataset, bibdf], ignore_index=True)
-    dataset.to_csv(libtex_csv, index=False)
+    dataset.to_csv(f"{input_folder}/{libtex_csv}.csv", index=False)
     return
 
 
 # collect keywords using all algorithms
-def extract_tags(records, column, name, Rake_stoppath, amount) -> None:
+def extract_tags(records, column, name, Rake_stoppath, amount, input_folder) -> None:
     """
     Determine keywords from the given column for each entry in a csv file using all seven algorithms: bigram, keybert, rake, textrank, topicrank, tf-idf and yake. 
 
@@ -809,18 +708,19 @@ def extract_tags(records, column, name, Rake_stoppath, amount) -> None:
     -----------
     None
     """
-    bigram_extraction(records, column, name, amount)
-    keybert_extraction(records, column, name, amount)
-    rake_extraction(records, column, name, Rake_stoppath, amount)
-    textrank_extraction(records, column, name, amount)
-    topicrank_extraction(records, column, name, amount)
-    tf_idf_extraction(records, column, name)
-    yake_extraction(records, column, name, amount)
+    records_path = f"{input_folder}/{records}.csv"
+    bigram_extraction(records_path, column, name, amount, input_folder)
+    keybert_extraction(records_path, column, name, amount, input_folder)
+    rake_extraction(records_path, column, name, Rake_stoppath, amount, input_folder)
+    textrank_extraction(records_path, column, name, amount, input_folder)
+    topicrank_extraction(records_path, column, name, amount, input_folder)
+    tf_idf_extraction(records_path, column, name, input_folder)
+    yake_extraction(records_path, column, name, amount, input_folder)
     return
 
 
 # construct keylist
-def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile: str = "", output_path: str = "input/keylist.csv", author_given_keywords: str = ""):
+def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile: str = "", output_name: str = "", input_folder:str="", author_given_keywords: str = "", original_keywords_txt:str=""):
     """
     Creates a masterlist of keywords from all seven algorithms, any keywords present in the wos file and any keywords present in the bib file, by filtering for unique keywords and filtering by stem.
 
@@ -841,22 +741,21 @@ def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile
     else:
         bib_original = []
     if author_given_keywords != "":
-        wos_original = open("input/wos_original_tags.txt", "r").readlines()
+        wos_original = open(f"{input_folder}/{original_keywords_txt}.txt", "r").readlines()
     else:
         wos_original = [""]
-
-    bigram_a = pd.read_csv("input/bigram_wos_a.csv")["ID"].tolist()
-    bigram_t = pd.read_csv("input/bigram_wos_t.csv")["ID"].tolist()
-    keybert_a = pd.read_csv("input/keybert_wos_a.csv")["ID"].tolist()
-    keybert_t = pd.read_csv("input/keybert_wos_t.csv")["ID"].tolist()
-    TextR_a = pd.read_csv("input/TextR_wos_a.csv")["ID"].tolist()
-    TextR_t = pd.read_csv("input/TextR_wos_t.csv")["ID"].tolist()
-    tf_idf_a = pd.read_csv("input/tf-idf_wos_a.csv")["ID"].tolist()
-    tf_idf_t = pd.read_csv("input/tf-idf_wos_t.csv")["ID"].tolist()
-    topicR_a = pd.read_csv("input/topicR_wos_a.csv")["ID"].tolist()
-    topicR_t = pd.read_csv("input/topicR_wos_t.csv")["ID"].tolist()
-    yake_a = pd.read_csv("input/yake_wos_a.csv")["ID"].tolist()
-    yake_t = pd.read_csv("input/yake_wos_t.csv")["ID"].tolist()
+    bigram_a = pd.read_csv(f"{input_folder}/bigram_wos_a.csv")["ID"].tolist()
+    bigram_t = pd.read_csv(f"{input_folder}/bigram_wos_t.csv")["ID"].tolist()
+    keybert_a = pd.read_csv(f"{input_folder}/keybert_wos_a.csv")["ID"].tolist()
+    keybert_t = pd.read_csv(f"{input_folder}/keybert_wos_t.csv")["ID"].tolist()
+    TextR_a = pd.read_csv(f"{input_folder}/TextR_wos_a.csv")["ID"].tolist()
+    TextR_t = pd.read_csv(f"{input_folder}/TextR_wos_t.csv")["ID"].tolist()
+    tf_idf_a = pd.read_csv(f"{input_folder}/tf-idf_wos_a.csv")["ID"].tolist()
+    tf_idf_t = pd.read_csv(f"{input_folder}/tf-idf_wos_t.csv")["ID"].tolist()
+    topicR_a = pd.read_csv(f"{input_folder}/topicR_wos_a.csv")["ID"].tolist()
+    topicR_t = pd.read_csv(f"{input_folder}/topicR_wos_t.csv")["ID"].tolist()
+    yake_a = pd.read_csv(f"{input_folder}/yake_wos_a.csv")["ID"].tolist()
+    yake_t = pd.read_csv(f"{input_folder}/yake_wos_t.csv")["ID"].tolist()
     newlist = list()
     cor_bigram_a = []
     cor_bigram_t = []
@@ -1007,29 +906,31 @@ def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile
         .drop_duplicates("ID", keep="last")
         .reset_index(drop=True)
     )
-    finallist.to_csv(output_path, index=False)
+    finallist.to_csv(f"{input_folder}/{output_name}.csv", index=False)
     return
 
 
 # complete keylist routine
-def generate_keylist(records="input/WOSselect.csv", titlecolumn="Article Title", abstactcolumn="Abstract", bibfile="", libtex_csv="input/savedrecs.csv", blacklist=blacklist, amount=50, author_given_keywords="", Rake_stoppath="C:/NLPvenv/RAKE/data/stoplists/SmartStoplist.txt"):
+def generate_keylist(input_folder="", records="", titlecolumn="Article Title", abstactcolumn="Abstract", bibfile="", libtex_csv="", output_name="", original_keywords_txt="", blacklist=blacklist, amount=50, author_given_keywords="", Rake_stoppath=""):
     """
     Gerenates a keyword list using the Web of Science records by 1) extracting indexed keywords 2) filtering article titles for keywords using all seven algorithms,  3) filtering article abstracts for keywords using all seven algorithms, 4) extracting keywords present in a bib file and 5) filtering for unique values excluding keywords present in the blacklist.
     All parameters but the WOS file path and bibfile path have default values.
 
     Parameters:
     -----------
-    records (str): Path to the csv containing the Web of Science records.
+    input_path (str): Path to the folder containing all files used as source.
+
+    records (str): Filename within the input_path to the csv containing the Web of Science records.
 
     titlecolumn (str): The column name containing the titles to analyse.
 
     abstactcolumn (str): The column name containing the abstracts to analyse.
 
-    name (str): String stating whether titles or abstracts are being analysed. May be equal to either "wos_a" or "wos_t". Additionally this parameter will be used as output name.
+    bibfile (str): Filename within the input_path to the bib file to be extracted.
 
-    bibfile (str): Path to the bib file to be extracted.
+    libtex_csv (str): Filename within the input_path to the csv file to write the output to.
 
-    libtex_csv (str): Path to the csv file to write the output to.
+    output_path (str):
 
     blacklist (list): list of strings to exclude.
 
@@ -1040,19 +941,19 @@ def generate_keylist(records="input/WOSselect.csv", titlecolumn="Article Title",
     None
     """
     if author_given_keywords != "":
-        get_original_keywords(records, author_given_keywords)
+        get_original_keywords(input_folder=input_folder, records=records, author_given_keywords=author_given_keywords, original_keywords_txt=original_keywords_txt)
     extract_tags(name="wos_t", column=titlecolumn, records=records,
-                 Rake_stoppath=Rake_stoppath, amount=amount)
+                 Rake_stoppath=Rake_stoppath, amount=amount, input_folder=input_folder)
     extract_tags(name="wos_a", column=abstactcolumn, records=records,
-                 Rake_stoppath=Rake_stoppath, amount=amount)
+                 Rake_stoppath=Rake_stoppath, amount=amount, input_folder=input_folder)
     if bibfile != "":
         import_bib(bibfile, libtex_csv)
-        construct_keylist(blacklist, author_given_keywords)
+        construct_keylist(blacklist=blacklist, author_given_keywords=author_given_keywords, input_folder=input_folder, output_name=output_name, original_keywords_txt=original_keywords_txt)
     else:
-        construct_keylist(blacklist, bibfile, author_given_keywords)
+        construct_keylist(blacklist=blacklist, bibfile=bibfile, author_given_keywords=author_given_keywords, input_folder=input_folder, output_name=output_name, original_keywords_txt=original_keywords_txt)
     return
 
 
 if __name__ == "__main__":
-    generate_keylist(records="input/records.csv", bibfile="input/library.bib",
-                     author_given_keywords="Author Keywords")
+    generate_keylist(input_folder= "C:/NLPvenv/nlp/input", records="records", bibfile="library", libtex_csv="savedrecs", output_name="keylist", original_keywords_txt="wos_original_tags",
+                     author_given_keywords="Author Keywords", Rake_stoppath="C:/NLPvenv/RAKE/data/stoplists/SmartStoplist.txt")
