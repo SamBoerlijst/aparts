@@ -56,7 +56,7 @@ Collect tags by scanning titles and abstracts of about 200 articles.
 3. Collect keywords from the titles and abstracts using 7 common NLP algorithms[^1]: bigram, keybert, RAKE, textrank, topicrank, TF-IDF and YAKE:
 [^1]: by default only keywords present in 2-4 of the algorithms their output are to prevent lay terms from being included.
 ```{python}
-generate_keylist(records = "input/records.csv", bibfile = "input/Library.bib")
+generate_keylist(input_folder = "C:/aparts/input", records = "records", bibfile = "Library")
 ```
 
 ### tag pdf files
@@ -67,7 +67,7 @@ Scrape pdf files and tag based on presence in the different article sections.
 [^3]: Weighing is determined as follows: Abstract: 4, Discussion: 3, Methods|Results: 2, Introduction:1, References: 0. A custom treshold used for exlcuding tags may be assigned (defaults to '2').
 3. Convert all articles to .txt, tag them and export tags to bib/csv/md:
 ```
- automated_pdf_tagging(source_folder="C:/.../Zotero/storage", bibfile="input/pc_Library_1-5-2023.bib", alternate_lists="all", weighted = True, treshold = 5, summaries = True)
+ automated_pdf_tagging(source_folder="C:/.../Zotero/storage", bibfile="C:/.../input/Library.bib", alternate_lists="all", weighted = True, treshold = 5, summaries = True)
 ```
 
 ### select articles by dissimilarity
