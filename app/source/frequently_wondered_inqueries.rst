@@ -9,6 +9,10 @@ Frequently wondered inqueries
 
 - A manual check to remove artifacts from the generated keywords is advised. Artifacts may be produced in case of typesetting issues (mainly in older pdf files), decoding issues or words containing special characters like chemical compounds.
 
+**My .bib file gives the error 'expected identifyer'. What happened?**
+
+- this error may occur when entries within the .bib file do not contain an identifyer like Boerlijst2023. Open the bib file with a text editor and look for '{,' and add an identifyer between the two characters.
+
 **I get decoding errors for certain documents during keylist_search().**
 
 - PDF encoding is not standardized and although this package automatically uses common decoding fixes, some articles might still return errors. In this case you may need to manually get rid of unicode characters in the respective txt file with an ascii converter like https://onlineunicodetools.com/convert-unicode-to-ascii.
