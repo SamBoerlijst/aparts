@@ -52,6 +52,14 @@ aparts.src.scholar\_record\_extraction module
    :undoc-members:
    :show-inheritance:
 
+aparts.src.subsampling module
+-------------------------------
+
+.. automodule:: aparts.src.subsampling
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 aparts.src.summarization module
 -------------------------------
 
