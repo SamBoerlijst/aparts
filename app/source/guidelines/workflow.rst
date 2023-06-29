@@ -31,9 +31,7 @@ The entries will be scanned for keywords by use of their corresponding pdf file.
 
 .. code-block:: bash
 
-  paper = get_article(title="Biting the hand that feeds: Anthropogenic drivers interactively make mosquitoes thrive")
-
-  scihub_download_pdf(paper=paper, output_folder = "C:/aparts/input/pdf")
+  scihub_download_pdf(paper=get_article(title="Biting the hand that feeds: Anthropogenic drivers interactively make mosquitoes thrive"), output_folder = "C:/aparts/input/pdf")
 
 
 
