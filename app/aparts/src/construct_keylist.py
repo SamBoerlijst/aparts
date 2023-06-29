@@ -388,7 +388,7 @@ def textrank_calculation(text: str, top_n: int = 5, n_gram: int = 3, output_grap
     top_keywords = sorted(scores, key=scores.get, reverse=True)[:top_n]
     graph.remove_nodes_from(set(graph.nodes) - set(top_keywords))
 
-    keyphrases = pd.DataFrame({'n-gram': top_keywords, 'score': [scores[kw] for kw in top_keywords]})
+    keyphrases = pd.DataFrame({'ID': top_keywords, 'score': [scores[kw] for kw in top_keywords]})
     if output_graph == True:
         return graph, keyphrases
     else:
