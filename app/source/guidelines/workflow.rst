@@ -26,6 +26,11 @@ To generate a list of keywords, run the following command indicating the locatio
 - libtex_csv: Filename for the outputfile containing the contents of the bib file
 
 
+.. note::
+
+  If this is the first time generating a keylist, be sure to read "Function overview/Construct keyword list" and install the mentioned dependencies.
+
+
 .. code-block:: python
 
   from aparts import generate_keylist
