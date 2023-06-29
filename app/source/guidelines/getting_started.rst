@@ -6,16 +6,7 @@ Install the library
 
 .. code-block:: bash
     
-    pip install aparts
-
-
-Confirm installation of direct dependencies
--------------------------------------------
-This package relies on the textrank and topicrank models from https://github.com/boudinfl/pke/tree/master. As pypi does not allow direct dependencies, this package has to be installed manually:
-
-.. code-block:: bash
-    
-    pip install git+https://github.com/boudinfl/pke.git
+    pip install git+https://github.com/SamBoerlijst/aparts.git
 
 
 Test the package
