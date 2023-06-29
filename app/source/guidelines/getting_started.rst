@@ -16,6 +16,6 @@ To test whether the library works you may use the function, which will prepare t
 
 .. code-block:: python
     
-    from aparts import generate_folder_structure
+    from aparts.src.construct_keylist import generate_folder_structure
 
     generate_folder_structure()
