@@ -127,4 +127,10 @@ Documentation for the package can be found at the [read the docs page](https://a
 
 **How long will the process take?**
 
-- Several functions may be time consuming. The scholarly lookups for article or author might take several minutes, keyword generation about 10 minutes for 100 records and keylist_search may take about 10 minutes for 500 files. 
+- Several functions may be time consuming. The scholarly lookups for article or author might take several minutes, keyword generation about 10 minutes for 100 records and keylist_search may take about 10 minutes for 500 files.
+
+<br>
+
+## Share
+You can cite this repo using the following citation:
+Sam Boerlijst. (2023). SamBoerlijst/aparts: 0.0.20 (0.0.2). Zenodo. https://doi.org/10.5281/zenodo.7916306
