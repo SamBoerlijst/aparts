@@ -55,7 +55,7 @@ Collect tags by scanning titles and abstracts of about 200 articles.
 2. Indicate whether i) author given keywords present in the searchrecords csv and ii) existing tags in a .bib file should be included.
 3. Collect keywords from the titles and abstracts using 7 common NLP algorithms[^1]: bigram, keybert, RAKE, textrank, topicrank, TF-IDF and YAKE:
 [^1]: by default only keywords present in 2-4 of the algorithms their output are to prevent lay terms from being included.
-```{python}
+```python
 generate_keylist(input_folder = "C:/aparts/input", records = "records", bibfile = "Library")
 ```
 
@@ -66,7 +66,7 @@ Scrape pdf files and tag based on presence in the different article sections.
 [^2]: Options include: 'all', 'statistics', 'countries', 'genomics', 'phylogenies', 'ecology', 'culicid_genera' or any combinations thereof e.g. "statistics and countries".
 [^3]: Weighing is determined as follows: Abstract: 4, Discussion: 3, Methods|Results: 2, Introduction:1, References: 0. A custom treshold used for exlcuding tags may be assigned (defaults to '2').
 3. Convert all articles to .txt, tag them and export tags to bib/csv/md:
-```
+```python
  automated_pdf_tagging(source_folder="C:/.../Zotero/storage", bibfile="C:/.../input/Library.bib", alternate_lists="all", weighted = True, treshold = 5, summaries = True)
 ```
 
@@ -74,11 +74,23 @@ Scrape pdf files and tag based on presence in the different article sections.
 Calculate tag-based dissimilarity, amd select the most dissimilar articles. 
 1. Provide a path to the CSV file containing the corpus to sample from.
 2. Indicate the amount of articles that should be selected.
-```
+```python
  subsample_from_csv(CSV_path="C:/.../output/csv/total.csv", n=30)
 ```
 <img src="./app/source/images/corpus_and_selection_n30.png" width="600">
 <figcaption align = "center"><b>Fig.1</b> Selected articles in blue superimposed over the corpus in red.</figcaption>
+
+### select tags by similarity and PCA
+Use Bray-curtis similarity to identify trends in keywords
+1. merge synonyms
+2. identify tag clusters to use in relevance feedback query expansion
+3. select important tags based on PCA loadings
+```python
+ Dataframe = merge_similar_tags_from_dataframe(input_file="C:/.../output/csv/total.csv", output="C:/.../output/csv/tags_deduplicated.csv", variables="Keywords", id="Article Title", tag_length=4)
+ plot_pca_tags(data=Dataframe, n_components_for_variance=50, show_plots="all")
+```
+<img src="./app/source/images/PCA.png" width="600">
+<figcaption align = "center"><b>Fig.1</b> Identify importance of different tags for each principal component and the corresponding variance explained.</figcaption>
 
 #### Markdown summaries
 Generate text based summaries using javascript code blocks so that the database stays dynamically updated.
