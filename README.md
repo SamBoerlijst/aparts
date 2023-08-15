@@ -90,7 +90,7 @@ Use Bray-curtis similarity to identify trends in keywords
  plot_pca_tags(data=Dataframe, n_components_for_variance=50, show_plots="all")
 ```
 <img src="./app/source/images/PCA.png" width="600">
-<figcaption align = "center"><b>Fig.1</b> Identify importance of different tags for each principal component and the corresponding variance explained.</figcaption>
+<figcaption align = "center"><b>Fig.2</b> Identify importance of different tags for each principal component and the corresponding variance explained.</figcaption>
 
 #### Markdown summaries
 Generate text based summaries using javascript code blocks so that the database stays dynamically updated.
@@ -110,7 +110,7 @@ Summary per journal containing authors by frequency, tags by frequency and assoc
 Generate an interactive node-network using pyvis.
 
 <img src="./app/source/images/graphview.png" width="600">
-<figcaption align = "center"><b>Fig.2</b> Overview of articles in blue, authors in green, journal in pink, date in red and tags in yellow.</figcaption>
+<figcaption align = "center"><b>Fig.3</b> Overview of articles in blue, authors in green, journal in pink, date in red and tags in yellow.</figcaption>
 
 <br>
 
