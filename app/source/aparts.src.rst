@@ -20,6 +20,14 @@ aparts.src.construct\_keylist module
    :undoc-members:
    :show-inheritance:
 
+aparts.src.deduplication module
+-------------------------------
+
+.. automodule:: aparts.src.deduplication
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 aparts.src.download\_pdf module
 -------------------------------
 
@@ -48,14 +56,6 @@ aparts.src.scholar\_record\_extraction module
 ---------------------------------------------
 
 .. automodule:: aparts.src.scholar_record_extraction
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-aparts.src.subsampling module
--------------------------------
-
-.. automodule:: aparts.src.subsampling
    :members:
    :undoc-members:
    :show-inheritance:
