@@ -18,6 +18,16 @@ Provides direct documentation of each function (in the pythonic sense of the wor
    :titlesonly:
    :includehidden:
 
+   modules
+
+Provides an overview of the documentation for all submodules.
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Function overview
+   :titlesonly:
+   :includehidden:
+
    Function_overview/collecting_article_records
    Function_overview/construct_keyword_list
    Function_overview/tag_papers
