@@ -684,9 +684,9 @@ def list_filenames(folder:str, type:str) -> list:
 
     Parameters:
     -----------
-    folder (str) : Path to the folder where the files are located.
+    folder (str): Path to the folder where the files are located. 
     
-    type (str): Extension of the files to filter e.g. "*.txt".
+    type (str): Extension of the files to filter e.g. asterisk followed by .txt.
 
     Returns:
     --------
@@ -1080,8 +1080,50 @@ def construct_keylist(keylist_path:str, alternate_lists:str)->list:
     keylist = sort_joined_list(keylist)
     return keylist
 
+def calculate_tag_counts(taglists, separator:str = ", ") -> pd.DataFrame:
+    """
+    Calculates the counts of tags across the entire corpus.
+
+    Parameters:
+    -----------
+    taglists (list, string or pd.Series): List of strings or list of lists containing tags from each document
+
+    separator (str): In case a Series is used as input, this indicates the separator between tags within an item 
+    
+    Returns:
+    -----------
+    tagcounts (pd.DataFrame): DataFrame containing the calculated counts per keyword over the entire corpus, ordered by occurrence
+    """
+
+    tag_counts = {}
+    def count_items(string_list: list):
+        for item in string_list:
+            if item in tag_counts:
+                tag_counts[item] += 1
+            else:
+                tag_counts[item] = 1
+    
+    if isinstance(taglists, list) and all(isinstance(sublist, list) for sublist in taglists):
+        for item in taglists:
+            count_items(item)
+    elif isinstance(taglists, list):
+        count_items(taglists)
+    elif isinstance(taglists, pd.Series):
+        split_list = [str(item).split(separator) for item in taglists]
+        taglist = [item for sublist in split_list for item in sublist]
+        count_items(taglist)
+    else:
+        print("please use a supported type: list, str or pd.Series")
+
+    tag_counts = pd.DataFrame({"keyword": list(tag_counts.keys()), "count": list(tag_counts.values())})
+
+    tag_counts = tag_counts.sort_values(by="count", ascending=False)
+
+    return tag_counts
+
+
 ## scan the txt files for strings contained in the keylist
-def tag_folder(TXTCorfolder="input/pdf/docs/corrected", keylist_path="input/keylist.csv", outputCSV="output/csv/keywords.csv", alternate_lists:str="none")-> None:
+def tag_folder(TXTCorfolder: str = "input/pdf/docs/corrected", keylist_path: str = "input/keylist.csv", outputCSV: str = "output/csv/keywords.csv", alternate_lists: str = "none", print_to_console: bool = False)-> None:
     """
     Scans all txt files in a given folder for keywords from the supplied csv file and any alternate lists specified. The output is stored as csv with the filename as index.
     
@@ -1094,6 +1136,8 @@ def tag_folder(TXTCorfolder="input/pdf/docs/corrected", keylist_path="input/keyl
     outputCSV (str): Path to the file in which to store the keywords indexed by document name. 
 
     alternate_lists (str): String defining the alternative lists to use. Options include: 'all', 'statistics', 'countries', 'genomics', 'phylogenies', 'ecology', 'culicid_genera' or any combinations thereof e.g. "statistics and countries".
+
+    print_to_console (bool): Whether a summary of the output should be shown in console log
 
     Return:
     -----------
@@ -1108,23 +1152,88 @@ def tag_folder(TXTCorfolder="input/pdf/docs/corrected", keylist_path="input/keyl
 
     outputfile = pd.read_csv(outputCSV)["file"].tolist()
     itemlist = list_filenames(TXTCorfolder, "*.txt")
-
+    taglists = []
+    
     for item in itemlist:
         if str(item) not in outputfile:
             with open(f"{TXTCorfolder}/{item}.txt", "rb") as file:
                 for line in file:
                     text = preprocess_text(line)
-                    text_keylist = find_keywords(keylist, text)
-                text_keylist = filter_uniques_from_list(text_keylist)
+                    keywords = find_keywords(keylist, text)
+                unique_keywords = filter_uniques_from_list(keywords)
+
+                taglists.append(unique_keywords)  # Add tags from current document to taglists
+
                 # create pandas row
                 dfcolumn = pd.DataFrame(
-                    {"file": str(item), "keywords": str(text_keylist)}, index=[0]
+                    {"file": str(item), "keywords": str(unique_keywords)}, index=[0]
                 )
                 dfcolumn.to_csv(outputCSV, mode="a", index=False, header=False)
-            print("tagged", str(item))
+            print(f"tagged {item}")
     
     print("finished writing tags to keywords.csv")
+    tagcounts = calculate_tag_counts(taglists)
+
+    if print_to_console:
+        print(tagcounts)
     return 
+
+def tag_csv(inputCSV: str, outputCSV: str = "", outputfolder: str = "C:/NLPvenv/NLP/output/csv", titlecolumn: str = "Title", abstractcolumn: str = "Abstract", keylist_path: str = "input/keylist.csv", alternate_lists: str = "none", print_to_console: bool = False) -> None:
+    """
+    Scans all items in a csv file for keywords and any alternate lists specified.
+    
+    Parameters:
+    -----------
+    inputCSV (str): Path to the file containing the items (title and abstract) to scan. 
+
+    outputCSV (str): Filename which to store the keywords indexed by document name. 
+
+    outputfolder (str): Path to the folder in which the output should be stored.
+
+    keylist_path (str): Path to the csv containg the keywords to be used. Generated by construct_keylist().
+
+    alternate_lists (str): String defining the alternative lists to use. Options include: 'all', 'statistics', 'countries', 'genomics', 'phylogenies', 'ecology', 'culicid_genera' or any combinations thereof e.g. "statistics and countries".
+
+    print_to_console (bool): Whether a summary of the output should be shown in console log
+
+    Return:
+    -----------
+    None
+    """
+    print("scanning csv for tags")
+
+    if len(outputCSV) == 0:
+        outputname = os.path.basename(inputCSV)
+        outputCSV = outputfolder + "/" + outputname
+        print(f"Output file set to: {outputCSV}")
+    keylist = construct_keylist(keylist_path, alternate_lists)
+
+    df = pd.read_csv(inputCSV)
+    df['Keywords'] = None
+    guarantee_csv_exists(outputCSV, df)
+    
+    taglists = []
+
+    for i in range(len(df)):
+        if df['Keywords'][i] == None:
+            item = str(df[titlecolumn][i]) + " " + str(df[abstractcolumn][i])
+            title = df[titlecolumn][i]
+            text = preprocess_text(item)
+            keywords = find_keywords(keylist, text)
+            unique_keywords = filter_uniques_from_list(keywords)
+            
+            taglists.append(unique_keywords)  # Add tags from current document to taglists
+            
+            df.loc[df[titlecolumn] == title, 'Keywords'] = ', '.join(unique_keywords)
+    
+    df.to_csv(outputCSV, index=False)
+    print("finished writing tags to keywords.csv")
+    tagcounts = calculate_tag_counts(taglists)
+
+    if print_to_console:
+        pd.set_option('display.max_rows', None) 
+        print(tagcounts)
+    return
 
 def tag_file_weighted(filename: str, keylist_path: str = "input/keylist.csv", alternate_lists: str ="all", treshold: int = 2, print_to_console: bool = False) -> dict[str, int]:
     """
@@ -1152,7 +1261,7 @@ def tag_folder_weighted(input_path: str, outputCSV="output/csv/keywords.csv", ke
 
     outputCSV (str): Path to the file in which to store the keywords indexed by document name. 
 
-    print_to_console (bool): whether the output should be shown in console log
+    print_to_console (bool): whether a summary of the output should be shown in console log
 
     Return:
     -----------
@@ -1166,11 +1275,15 @@ def tag_folder_weighted(input_path: str, outputCSV="output/csv/keywords.csv", ke
 
     outputfile = pd.read_csv(outputCSV)["file"].tolist()
     itemlist = list_filenames(input_path, "*.txt")
+    taglists = []
 
     for item in itemlist:
         file_path = f"{input_path}/{item}.txt"
         if str(item) not in outputfile:
             text_keylist = list(tag_file_weighted(file_path, keylist_path, alternate_lists, treshold).keys())
+            
+            taglists.append(text_keylist) 
+
             # create pandas row
             dfcolumn = pd.DataFrame(
             {"file": str(item), "keywords": str(text_keylist)}, index=[0])
@@ -1178,6 +1291,10 @@ def tag_folder_weighted(input_path: str, outputCSV="output/csv/keywords.csv", ke
             print("tagged", str(item))
     
     print("finished writing tags to keywords.csv")
+    tagcounts = calculate_tag_counts(taglists)
+
+    if print_to_console == True:
+        print(tagcounts)
     return 
 
 ## write the tags back into the .bib file
@@ -1496,4 +1613,9 @@ def automated_pdf_tagging(source_folder:str="", PDFfolder:str="input/pdf", TXTfo
 
 
 if __name__ == "__main__":
-    automated_pdf_tagging(source_folder="C:/Users/sboer/Zotero/storage", bibfile="input/library.bib", alternate_lists="all", weighted = True, treshold = 5, summaries = True)
+    #automated_pdf_tagging(source_folder="C:/Users/sboer/Zotero/storage", bibfile="input/library.bib", alternate_lists="all", weighted = True, treshold = 5, summaries = True)
+    #tag_csv(inputCSV="C:/NLPvenv/NLP/input/savedrecs_lianas.csv", titlecolumn="Article Title", keylist_path="C:/NLPvenv/NLP/input/keylist_lianas.csv", print_to_console=True)
+    df = pd.read_csv("C:/NLPvenv/NLP/output/csv/savedrecs_lianas.csv")['Keywords']
+    summary = calculate_tag_counts(df)
+    pd.set_option('display.max_rows', None) 
+    print(summary)
