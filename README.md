@@ -8,7 +8,7 @@ Automated workflow to generate a tailored set of keywords and index academic art
 <br>
 
 ## Functionality
-- Import (scholarly) records using a query representative of the field of research.
+- Import (semantic scholar or scholarly) records using a query representative of the field of research.
 - Generate a set of keywords by processing titles and abstracts using 7 NLP algorithms.
 - Tag all pdf files within a folder irrespective of folder structure.
 - Return the keywords to a .bib file for use in reference managers, and .csv for meta-analysis.
@@ -19,7 +19,8 @@ Automated workflow to generate a tailored set of keywords and index academic art
 - Bib to csv conversion.
 - Tag articles weighted by section in which each tag is found.
 - Download missing pdf files using sci-hub.
-- Generate article summaries.
+- Generate article summaries by key sentences.
+- import tldr summaries from semantic scholar using its S2AG api. 
 - Integrated node-network visualization.
 - Query expansion by (pseudo) relevane.
 - Select articles based on tag dissimilarity.
