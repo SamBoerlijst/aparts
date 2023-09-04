@@ -60,6 +60,14 @@ aparts.src.scholar\_record\_extraction module
    :undoc-members:
    :show-inheritance:
 
+aparts.src.semantic\_scholar module
+---------------------------------------------
+
+.. automodule:: aparts.src.semantic_scholar
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 aparts.src.summarization module
 -------------------------------
 
