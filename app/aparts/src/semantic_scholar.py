@@ -14,6 +14,96 @@ T = TypeVar('T')
 S2_API_KEY = os.environ.get('S2_API_KEY', '')
 
 
+class Paper:
+    def __init__(self, paper_data):
+        self.externalIds = paper_data.get('externalIds', {})
+        self.DOI = self.externalIds.get('DOI', '')
+        self.title = paper_data.get('title', '')
+        self.authors = self._get_author_names(paper_data.get('authors', []))
+        self.first_author = paper_data.get(
+            'authors', [])[0]['name'] if self.authors else ''
+        self.year = paper_data.get('year', '')
+        self.abstract = paper_data.get('abstract', '')
+        self.tldr = paper_data.get('tldr', {}).get(
+            'text', '') if paper_data.get('tldr', {}) else ''
+        self.journal = paper_data.get('journal', {}).get(
+            'name', '') if paper_data.get('journal', {}) else ''
+        self.fieldsOfStudy = ', '.join(paper_data.get(
+            'fieldsOfStudy', [])) if paper_data.get('fieldsOfStudy', []) else ''
+        self.s2FieldsOfStudy = ', '.join([field['category'] for field in paper_data.get(
+            's2FieldsOfStudy', [])]) if paper_data.get('s2FieldsOfStudy', []) else ''
+        self.citationCount = paper_data.get('citationCount', '')
+        self.openAccessPdf = paper_data.get('openAccessPdf').get('url') if paper_data.get('openAccessPdf') else ''
+
+    def _get_author_names(self, authors):
+        author_list = [author['name'] for author in authors]
+        author_string = ', '.join(author_list)
+        return author_string
+
+    def asdict(self):
+        return {'externalIds': self.externalIds, 'DOI': self.DOI, 'title': self.title, 'authors': self.authors,
+                'first_author': self.first_author, 'year': self.year, 'abstract': self.abstract, 'tldr': self.tldr,
+                'journal': self.journal, 'fieldsOfStudy': self.fieldsOfStudy, 's2FieldsOfStudy': self.s2FieldsOfStudy,
+                'citationCount': self.citationCount, 'openAccessPdf': self.openAccessPdf}
+
+
+class Recommendation:
+    def __init__(self, paper_data):
+        self.url = paper_data.get('url', '')
+        self.title = paper_data.get('title', '')
+        self.authors = self._get_author_names(paper_data.get('authors', []))
+        self.first_author = paper_data.get(
+            'authors', [])[0].get('name', '') if self.authors else ''
+        self.year = paper_data.get('year', '')
+        self.abstract = paper_data.get('abstract', '')
+        self.journal = paper_data.get('journal', {}).get(
+            'name', '') if paper_data.get('journal', {}) else ''
+        self.fieldsOfStudy = ', '.join(paper_data.get(
+            'fieldsOfStudy', [])) if paper_data.get('fieldsOfStudy', []) else ''
+        self.s2FieldsOfStudy = ', '.join([field['category'] for field in paper_data.get(
+            's2FieldsOfStudy', [])]) if paper_data.get('s2FieldsOfStudy', []) else ''
+        self.citationCount = paper_data.get('citationCount', '')
+        self.openAccessPdf = paper_data.get('openAccessPdf', {}).get('url', '') if paper_data.get('openAccessPdf') else ''
+        self.source = paper_data.get('source', '')
+
+    def _get_author_names(self, authors):
+        author_list = [author.get('name', '') for author in authors]
+        author_string = ', '.join(author_list)
+        return author_string
+
+    def asdict(self):
+        return {'url': self.url, 'title': self.title, 'authors': self.authors,
+                'first_author': self.first_author, 'year': self.year, 'abstract': self.abstract,
+                'journal': self.journal, 'fieldsOfStudy': self.fieldsOfStudy, 's2FieldsOfStudy': self.s2FieldsOfStudy,
+                'citationCount': self.citationCount, 'openAccessPdf': self.openAccessPdf, 'source': self.source}
+    
+
+class Author:
+    def __init__(self, author_data):
+        aliases = author_data.get('aliases', [])
+        alias = max(aliases, key=len) if aliases else ''
+        self.name = author_data.get('name', '')
+        self.alias = alias
+        self.url = author_data.get('url', '')
+        self.authorId = author_data.get('authorId', '')
+        self.externalIds = author_data.get('externalIds', '')
+        self.paperCount = author_data.get('paperCount', '')
+        self.citationCount = author_data.get('citationCount', '')
+        self.hIndex = author_data.get('hIndex', '')
+
+    def asdict(self):
+        return {
+            'name': self.name,
+            'alias': self.alias,
+            'url': self.url,
+            'authorId': self.authorId,
+            'externalIds': self.externalIds,
+            'paperCount': self.paperCount,
+            'citationCount': self.citationCount,
+            'hIndex': self.hIndex
+        }
+    
+    
 def json_paper_to_dict(response) -> dict:
     """
     Converts a list of paper metadata in JSON format to a dictionary.
@@ -27,28 +117,12 @@ def json_paper_to_dict(response) -> dict:
     corpus_data (dict): A dictionary where keys are unique identifiers for papers, and values are lists of dictionaries containing paper metadata.
     """
     corpus_data = {}
-    for paper in response:
-        if not paper:
+    for paper_data in response:
+        if not paper_data:
             continue
-        paper_authors = paper.get('authors', [])
-        paper_data = {
-            'externalIds': paper.get('externalIds', ''),
-            'DOI': paper['externalIds'].get('DOI', ''),
-            'title': paper.get('title', ''),
-            'first_author': paper_authors[0].get('name', ''),
-            'authors': ', '.join([author['name'] for author in paper_authors]),
-            'year': paper.get('year', ''),
-            'abstract': paper.get('abstract', ''),
-            'tldr': paper.get('tldr', {}).get('text', '') if paper.get('tldr', {}) else '',
-            'journal': paper.get('journal', {}).get('name', '') if paper.get('journal', {}) else '',
-            'fieldsOfStudy': ', '.join([studyfield for studyfield in paper.get('fieldsOfStudy', '')]) if paper.get('fieldsOfStudy', '') else '',
-            's2FieldsOfStudy': ', '.join([studyfield['category'] for studyfield in paper.get('s2FieldsOfStudy', '')]) if paper.get('s2FieldsOfStudy', '') else '',
-            'citationCount': paper.get('citationCount', ''),
-            'openAccessPdf': paper['openAccessPdf']['url'] if paper['openAccessPdf'] else '',
-        }
+        paper = Paper(paper_data).asdict()
         ID = str(uuid1())
-        corpus_data[ID] = []
-        corpus_data[ID].append(paper_data)
+        corpus_data[ID] = [paper]
     return corpus_data
 
 
@@ -65,29 +139,20 @@ def json_recommendation_to_dict(response) -> dict:
     corpus_data (dict): A dictionary where keys are unique identifiers for papers, and values are lists of dictionaries containing paper metadata.
     """
     corpus_data = {}
-    for paper in response:
-        paper_authors = paper.get('authors', [])
-        paper_data = {
-            'url': paper.get('url', ''),
-            'title': paper.get('title', ''),
-            'first_author': paper_authors[0].get('name', '') if paper_authors else '',
-            'authors': ', '.join([author['name'] for author in paper_authors]),
-            'year': paper.get('year', ''),
-            'abstract': paper.get('abstract', ''),
-            'journal': paper.get('journal', {}).get('name', '') if paper.get('journal', {}) else '',
-            'fieldsOfStudy': ', '.join([studyfield for studyfield in paper.get('fieldsOfStudy', '')]) if paper.get('fieldsOfStudy', '') else '',
-            's2FieldsOfStudy': ', '.join([studyfield['category'] for studyfield in paper.get('s2FieldsOfStudy', '')]) if paper.get('s2FieldsOfStudy', '') else '',
-            'citationCount': paper.get('citationCount', ''),
-            'openAccessPdf': paper['openAccessPdf']['url'] if paper['openAccessPdf'] else '',
-            'source': paper.get('source', ''),
-        }
+    for paper_data in response:
+        if not paper_data:
+            continue
+        paper = Recommendation(paper_data).asdict()
         ID = str(uuid1())
-        corpus_data[ID] = []
-        corpus_data[ID].append(paper_data)
-        # print(f"{paper_data['authors']}. {paper_data['year']}. \"{paper_data['title']}\" {paper_data['journal']}. {paper_data['url']}.")
+        corpus_data[ID] = [paper]
+
     return corpus_data
 
+def return_apa6(paper:dict)->str:
+    citation = f"{paper['authors']}. {paper['year']}. \"{paper['title']}\" {paper['journal']}. {paper['url']}."
+    return citation
 
+    
 def json_author_to_dict(response) -> dict:
     """
     Converts a list of author metadata in JSON format to a dictionary.
@@ -101,24 +166,13 @@ def json_author_to_dict(response) -> dict:
     corpus_data (dict): A dictionary where keys are unique identifiers for papers, and values are lists of dictionaries containing paper metadata.
     """
     corpus_data = {}
-    for author in response:
-        if not author:
+    for author_data in response:
+        if not author_data:
             continue
-        aliases = author.get('aliases', [])
-        alias = max(aliases, key=len)
-        author_data = {
-            'name': author.get('name', ''),
-            'alias': alias,
-            'url': author.get('url', ''),
-            'authorId': author.get('authorId', ''),
-            'externalIds': author.get('externalIds', ''),
-            'paperCount': author.get('paperCount', ''),
-            'citationCount': author.get('citationCount', ''),
-            'hIndex': author.get('hIndex', ''),
-        }
+        author = Author(author_data).asdict()
         ID = str(uuid1())
-        corpus_data[ID] = []
-        corpus_data[ID].append(author_data)
+        corpus_data[ID] = [author]
+
     return corpus_data
 
 
@@ -385,6 +439,65 @@ def query_to_csv(query: str, output: str, amount: int = 100) -> None:
     return
 
 
-if __name__ == '__main__':
+"""if __name__ == '__main__':
     #batch_collect_recommendation_metadata(input=['10.2139/ssrn.4159446'], output='recommendation.csv')
-    query_to_csv(query="Culex pipiens AND population dynamics", output = 'papers.csv')
+    query_to_csv(query="Culex pipiens AND population dynamics", output = 'papers.csv')"""
+
+
+author_normal = [
+    {
+        "name": "John Doe",
+        "aliases": ["Johnny D", "J. Doe"],
+        "url": "http://example.com/johndoe",
+        "authorId": "12345",
+        "externalIds": ["abc123", "def456"],
+        "paperCount": 10,
+        "citationCount": 100,
+        "hIndex": 5
+    },
+    {
+        "name": "Jane Smith",
+        "aliases": ["J. Smith"],
+        "url": "http://example.com/janesmith",
+        "authorId": "67890",
+        "externalIds": ["xyz789"],
+        "paperCount": 8,
+        "citationCount": 80,
+        "hIndex": 4
+    }
+]
+
+
+def test_json_author_to_dict():
+    input_data = author_normal
+    corpus_data = json_author_to_dict(input_data)
+    author_id_1 = list(corpus_data.keys())[0]
+    author_data_1 = corpus_data[author_id_1][0]
+    assert 'http://example.com/johndoe' == author_data_1['url']
+    assert 'John Doe' == author_data_1['name']
+    assert 'Johnny D' == author_data_1['alias']
+    assert '12345' == author_data_1['authorId']
+    assert ['abc123', 'def456'] == author_data_1['externalIds']
+    assert 10 == author_data_1['paperCount']
+    assert 100 == author_data_1['citationCount']
+    assert 5 == author_data_1['hIndex']
+
+
+def test_json_author_to_dict_empty():
+    input_data = [{}]
+    corpus_data = json_author_to_dict(input_data)
+    assert {} == corpus_data
+
+
+def test_json_author_to_dict_near_empty():
+    input_data = [{"authorId": "12345"}]
+    corpus_data = json_author_to_dict(input_data)
+    paper_id = list(corpus_data.keys())[0]
+    paper_data = corpus_data[paper_id][0]
+    control = {'name': '', 'alias': '', 'url': '', 'authorId': '12345', 'externalIds': '', 'paperCount': '', 'citationCount': '', 'hIndex': ''}
+    assert control == paper_data
+
+if __name__ == '__main__':
+    test_json_author_to_dict()
+    test_json_author_to_dict_empty()
+    test_json_author_to_dict_near_empty()
