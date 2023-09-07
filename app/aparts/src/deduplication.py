@@ -385,5 +385,5 @@ def main(input_file: str, output: str, variables: str, id: str, tag_length: int,
 
 
 if __name__ == "__main__":
-    main(input_file="C:/.../output/csv/total.csv", output="C:/NLPvenv/NLP/output/csv/total_deduplicated.csv",
-         variables="Keywords", id="Article Title", tag_length=4, n_components_for_variance=40, show_plots="all")
+    main(input_file="C:/NLPvenv/NLP/output/csv/savedrecs_lianas.csv", output="C:/NLPvenv/NLP/output/csv/lianas_deduplicated.csv",
+         variables="Keywords", id="Article Title", tag_length=4, n_components_for_variance=20, show_plots="all")
