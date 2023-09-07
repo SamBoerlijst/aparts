@@ -52,6 +52,14 @@ aparts.src.graph module
    :undoc-members:
    :show-inheritance:
 
+aparts.src.query\_expansion module
+------------------------------------
+
+.. automodule:: aparts.src.query_expansion
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 aparts.src.scholar\_record\_extraction module
 ---------------------------------------------
 
