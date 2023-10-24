@@ -103,7 +103,7 @@ class Author:
             'hIndex': self.hIndex
         }
     
-    
+
 def json_paper_to_dict(response) -> dict:
     """
     Converts a list of paper metadata in JSON format to a dictionary.
@@ -235,7 +235,20 @@ def fetch_metadata_semantic_scholar(args: argparse.Namespace, input: list, field
     return corpus_data
 
 
-def fetch_authors_semantic_scholar(input_list: list, fieldnames: list = ""):
+def fetch_authors_semantic_scholar(input_list: list, fieldnames: list = "")->list:
+    """
+    Fetches metadata for a list of authors from the Semantic Scholar API and stores it in a CSV file.
+
+    Parameters:
+    -----------
+    input (list): List of author names or other identifyers used to search for the papers.
+
+    fieldnames (list): A list of fields to include in the CSV file.
+
+    Returns:
+    -----------
+    None
+    """
     dataset = []
     fieldnames = ','.join(fieldnames)
     for author in input_list:
@@ -254,7 +267,20 @@ def fetch_authors_semantic_scholar(input_list: list, fieldnames: list = ""):
     return dataset
 
 
-def fetch_recommendations_semantic_scholar(input_list: list, fieldnames: list = ""):
+def fetch_recommendations_semantic_scholar(input_list: list, fieldnames: list = "")->list:
+    """
+    Fetches recommended articles for a list of DOIs from the Semantic Scholar API and stores it in a CSV file.
+
+    Parameters:
+    -----------
+    input (list): List of DOIs or other identifyers used to search for the papers.
+
+    fieldnames (list): A list of fields to include in the CSV file.
+
+    Returns:
+    -----------
+    None
+    """
     dataset = []
     fieldnames = ','.join(fieldnames)
     for source in input_list:
@@ -393,7 +419,7 @@ def batch_collect_recommendation_metadata(input: str, output: str, fieldnames: l
     return
 
 
-def fetch_query_semantic_scholar(query: str, fields: str = "", amount: int = 200) -> dict:
+def fetch_query_semantic_scholar(query: str, fields: str = "", amount: int = 100) -> dict:
     """
     Fetches paper metadata from the Semantic Scholar API based on a query and specified fields.
 
@@ -439,65 +465,6 @@ def query_to_csv(query: str, output: str, amount: int = 100) -> None:
     return
 
 
-"""if __name__ == '__main__':
-    #batch_collect_recommendation_metadata(input=['10.2139/ssrn.4159446'], output='recommendation.csv')
-    query_to_csv(query="Culex pipiens AND population dynamics", output = 'papers.csv')"""
-
-
-author_normal = [
-    {
-        "name": "John Doe",
-        "aliases": ["Johnny D", "J. Doe"],
-        "url": "http://example.com/johndoe",
-        "authorId": "12345",
-        "externalIds": ["abc123", "def456"],
-        "paperCount": 10,
-        "citationCount": 100,
-        "hIndex": 5
-    },
-    {
-        "name": "Jane Smith",
-        "aliases": ["J. Smith"],
-        "url": "http://example.com/janesmith",
-        "authorId": "67890",
-        "externalIds": ["xyz789"],
-        "paperCount": 8,
-        "citationCount": 80,
-        "hIndex": 4
-    }
-]
-
-
-def test_json_author_to_dict():
-    input_data = author_normal
-    corpus_data = json_author_to_dict(input_data)
-    author_id_1 = list(corpus_data.keys())[0]
-    author_data_1 = corpus_data[author_id_1][0]
-    assert 'http://example.com/johndoe' == author_data_1['url']
-    assert 'John Doe' == author_data_1['name']
-    assert 'Johnny D' == author_data_1['alias']
-    assert '12345' == author_data_1['authorId']
-    assert ['abc123', 'def456'] == author_data_1['externalIds']
-    assert 10 == author_data_1['paperCount']
-    assert 100 == author_data_1['citationCount']
-    assert 5 == author_data_1['hIndex']
-
-
-def test_json_author_to_dict_empty():
-    input_data = [{}]
-    corpus_data = json_author_to_dict(input_data)
-    assert {} == corpus_data
-
-
-def test_json_author_to_dict_near_empty():
-    input_data = [{"authorId": "12345"}]
-    corpus_data = json_author_to_dict(input_data)
-    paper_id = list(corpus_data.keys())[0]
-    paper_data = corpus_data[paper_id][0]
-    control = {'name': '', 'alias': '', 'url': '', 'authorId': '12345', 'externalIds': '', 'paperCount': '', 'citationCount': '', 'hIndex': ''}
-    assert control == paper_data
-
 if __name__ == '__main__':
-    test_json_author_to_dict()
-    test_json_author_to_dict_empty()
-    test_json_author_to_dict_near_empty()
+    #batch_collect_recommendation_metadata(input=['10.2139/ssrn.4159446'], output='recommendation.csv')
+    query_to_csv(query="Culex pipiens AND population dynamics", output = 'papers.csv')

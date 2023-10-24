@@ -1,10 +1,9 @@
 import os
 
 import matplotlib.pyplot as plt
-import nltk
 import numpy as np
 import pandas as pd
-from fuzzywuzzy import fuzz, process
+from fuzzywuzzy import fuzz
 from nltk.corpus import wordnet
 from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
@@ -158,6 +157,24 @@ def group_synonyms(words, fuzzy_threshold = ""):
     return grouped_list
 
 
+def group_related_words(word_list):
+    synsets = {}
+    
+    for word in word_list:
+        synsets[word] = set([lemma.name() for syn in wordnet.synsets(word) for lemma in syn.lemmas()])
+    
+    grouped_words = []
+    processed = set()
+    
+    for word in word_list:
+        if word not in processed:
+            related = synsets[word]
+            grouped_words.extend(related)
+            processed.update(related)
+    
+    return list(set(grouped_words))
+
+
 def expand_query_with_tag_similarity(query, tags, threshold=0.2, top_k=1):
     """
     Expand a query based on tag similarity.
@@ -304,7 +321,11 @@ if __name__ == "__main__":
     expanded_query = expanded_query1 + expanded_query2
     expanded_query = ', '.join(expanded_query)
     expanded_terms = merge_words_by_stem_and_wildcards(expanded_query)
-    merged_terms = group_synonyms(expanded_terms)
+    #merged_terms = group_synonyms(expanded_terms)
+    print(expanded_terms)
+    expanded_terms = group_related_words(expanded_terms)
+    print(expanded_terms)
+    """
     merged_terms = ' OR '.join(merged_terms)
 
     if merged_terms:
@@ -313,11 +334,9 @@ if __name__ == "__main__":
         expanded_query = original_query
     print(expanded_query)
     expanded_query_1, top_articles = pseudo_relevance_feedback("C:/NLPvenv/NLP/output/csv/savedrecs_lianas.csv", expanded_query, trainingset=(20,60), n_articles=40)
-
+    """
 
 
 # pca to see tag clustering?
-
-# borda count
 
 # correct for dependence among tags

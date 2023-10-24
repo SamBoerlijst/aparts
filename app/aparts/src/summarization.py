@@ -3,6 +3,9 @@ from spacy.lang.en.stop_words import STOP_WORDS
 from string import punctuation
 from heapq import nlargest
 from aparts.src.weighted_tagging import split_text_to_sections
+from aparts.src.APT import list_filenames, guarantee_csv_exists
+import pandas as pd
+import os
 
 def remove_repeating_sentences(sentence_tokens:list, sections:dict)->list:
     """
@@ -113,6 +116,7 @@ def summarize_text(text:str, sectiondict:dict, amount:int, offset:int)->str:
     -----------
     summary (str): Summarized representation of the source file.
     """
+    text = (text[:99999] + '..') if len(text) > 99999 else text 
     sentence_tokens, word_frequencies = generate_sentence_tokens(text)
     sentence_tokens_filtered = remove_repeating_sentences(sentence_tokens, sectiondict)
     summary = summarize_tokens(sentence_tokens_filtered, word_frequencies, amount, offset)
@@ -143,6 +147,38 @@ def summarize_file(filepath:str, sections:list, amount:int, offset:int)->str:
     summary = summarize_text(text, sectiondict, amount, offset)
     return summary
 
+def summarize_csv(outputCSV:str, txtfolder:str, sections:list, amount:int, offset:int)->None:
+    """
+    Generates a summary of the source text for all txt files in the given folder. The generated summary is derived from sentences from the listed sections.
+    
+    Parameters:
+    -----------
+    CSV (str): Absolute path to the Excel file the summaries should be exported to.
+    
+    txtfolder (str): Absolute path to the folder containing the txt files to summarize.
+    
+    sections (list): List of sections to include in summarization.
+    
+    amount (int): The length of the summary given as the number of sentences.
+    
+    offset (int): Excludes the n highest rated sentences from the summary.
+
+    Returns:
+    -----------
+    summary (str): Summarized representation of the source file.
+    """
+    header = pd.DataFrame(columns = ["file", "summary"])
+    guarantee_csv_exists(outputCSV, header)
+    file_list = list_filenames(txtfolder, "*.txt")
+    previously_summarized = pd.read_csv(outputCSV)["file"].tolist()
+    for item in file_list:
+        if str(item) not in previously_summarized:
+            filepath = f"{txtfolder}/{item}.txt"
+            summary = summarize_file(filepath, sections, amount, offset)
+            pd_row = pd.DataFrame({"file": item, "summary": summary}, index=[0])
+            pd_row.to_csv(outputCSV, mode='a', index=False, header=False)
+            print(f'summarized {item}')
+    return
+
 if __name__ == "__main__":
-    summary = summarize_file("C:/NLPvenv/NLP/input/pdf/docs/corrected/test/Ibañez-Justicia and Cianci - 2015 - Modelling the spatial distribution of the nuisance.txt", ['abstract', 'discussion', 'conclusion'], 2, 1)
-    print(summary)
+    summarize_csv("C:/NLPvenv/NLP/output/csv/summarized.csv", "C:/NLPvenv/NLP/input/pdf/docs/corrected", ['abstract', 'discussion', 'conclusion'], 2, 2)
