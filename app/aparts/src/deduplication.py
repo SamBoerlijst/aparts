@@ -1,15 +1,17 @@
-from itertools import combinations
-
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-from sklearn.cluster import AgglomerativeClustering
-from sklearn.decomposition import PCA
-from sklearn.metrics import pairwise_distances
-from sklearn.preprocessing import StandardScaler
-
 from aparts.src.subsampling import (assign_group, generate_binary_item_matrix,
                                     transform_dataframe)
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import pairwise_distances
+from sklearn.decomposition import PCA
+from sklearn.cluster import AgglomerativeClustering, KMeans
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from itertools import combinations
+import os
+import matplotlib
+matplotlib.use('TkAgg')
 
 
 def group_tags_by_dissimilarity(dissimilarity_matrix: np.ndarray, tag_names: list, threshold: float = 0.5, print_output: bool = False) -> list:
@@ -131,7 +133,7 @@ def deduplicate_dataframe(dataframe: pd.DataFrame, pairs_list: list, mode: str =
     return deduplicated_dataframe
 
 
-def merge_similar_tags_from_dataframe(input_file: str, output: str, variables: str, id: str, tag_length: int, threshold: float = 0.6, manual: bool = False, show_output: bool = False):
+def merge_similar_tags_from_dataframe(input_file: str, output: str, variables: str, id: str, tag_length: int,  number_of_records: int = "", threshold: float = 0.6, manual: bool = False, show_output: bool = False):
     """
     Merges similar tags in a DataFrame based on tag similarity using various deduplication methods.
 
@@ -147,6 +149,8 @@ def merge_similar_tags_from_dataframe(input_file: str, output: str, variables: s
 
     tag_length (int): Length of tag n-grams for similarity comparison.
 
+    number_of_records (int): Select only the top n records.
+    
     threshold (float, optional): Similarity threshold for grouping tags. Default is 0.6.
 
     manual (bool): include manual check of potential duplicates by y/n prompt per pair to either merge or discard ('q' to escape). Default is False.
@@ -207,7 +211,7 @@ def merge_similar_tags_from_dataframe(input_file: str, output: str, variables: s
         return deduplicated_dataframe
 
     matrix = generate_binary_item_matrix(
-        input_file, variables, id, tag_length)[0]
+        input_file, variables, id, tag_length, number_of_records)[0]
     matrix = drop_0_columns(matrix)
     deduplicated_tags = calculate_tag_similarity(matrix, "pairs", threshold)[0]
 
@@ -279,7 +283,7 @@ def drop_unique_columns(Dataframe: pd.DataFrame) -> pd.DataFrame:
     return filtered_dataframe
 
 
-def plot_pca_tags(data: pd.DataFrame, n_components_for_variance: int = 0, show_plots: str = ""):
+def plot_pca_tags(data: pd.DataFrame, n_components_for_variance: int = 0, show_plots: str = "") -> tuple[list[str], PCA, int]:
     column_names = list(data.columns)
     # You need to define assign_group function
     groups = assign_group(data, column_names)
@@ -294,6 +298,7 @@ def plot_pca_tags(data: pd.DataFrame, n_components_for_variance: int = 0, show_p
 
     explained_variance_ratio = pca.explained_variance_ratio_
     cumulative_variance = np.cumsum(explained_variance_ratio)
+    num_components_for_80_variance = np.argmax(cumulative_variance >= 0.80) + 1
     num_components_for_95_variance = np.argmax(cumulative_variance >= 0.95) + 1
 
     def plots(show_plots):
@@ -364,26 +369,111 @@ def plot_pca_tags(data: pd.DataFrame, n_components_for_variance: int = 0, show_p
         main_tags_str = ', '.join(main_tags)
         print(
             f'Main contributing tags for {components}% explained variance: {main_tags_str}')
+        return main_tags
 
     if "all" in show_plots:
         show_plots = "loading and scree and saturation"
 
     if n_components_for_variance > 0:
-        find_contributing_tags(n_components_for_variance)
+        main_tags = find_contributing_tags(n_components_for_variance)
+    else:
+        main_tags = []
 
-    plots(show_plots)
-    plt.show()
+    if show_plots:
+        plots(show_plots)
+        plt.show()
 
-    return
+    return main_tags, pca, num_components_for_80_variance
 
 
-def main(input_file: str, output: str, variables: str, id: str, tag_length: int, n_components_for_variance: int, show_plots: str):
+def retrieve_pca_components(input_file: str, output: str, variables: str, id: str, tag_length: int,  number_of_records: int, n_components_for_variance: int, show_plots: str):
     Dataframe_merged = merge_similar_tags_from_dataframe(
-        input_file, output, variables, id, tag_length)
+        input_file, output, variables, id, tag_length, number_of_records)
     Dataframe_filtered = drop_unique_columns(Dataframe_merged)
-    plot_pca_tags(Dataframe_filtered, n_components_for_variance, show_plots)
+    components = plot_pca_tags(
+        Dataframe_filtered, n_components_for_variance, show_plots)[0]
+    return components
 
 
-if __name__ == "__main__":
-    main(input_file="C:/NLPvenv/NLP/output/csv/savedrecs_lianas.csv", output="C:/NLPvenv/NLP/output/csv/lianas_deduplicated.csv",
-         variables="Keywords", id="Article Title", tag_length=4, n_components_for_variance=20, show_plots="all")
+def retrieve_clusters(input_file: str, output: str, variables: str, id: str, tag_length: int, number_of_records: int, n_components_for_variance: int, show_plots: str, transpose: bool = False, label: bool = False, max_clusters: int = 20, visualize_clusters:bool = False) -> pd.DataFrame:
+
+    def retrieve_metadata_from_title(dataframe_a: pd.DataFrame, title_col_a: str, dataframe_b: pd.DataFrame, title_col_b: str) -> pd.DataFrame:
+        "Return all data for each row in dataframe_b that has a matching title in dataframe_a"
+        merged_df = pd.merge(dataframe_a[title_col_a], dataframe_b,
+                             how='inner', left_on=title_col_a, right_on=title_col_b)
+        return merged_df
+
+    def perform_kmeans_clustering(scores_pca, max_clusters):
+        "Perform k-means clustering up to the max cluster size and return a figure showing the inertia/fit."
+        wcss = []
+        for i in range(1, (max_clusters + 1)):
+            kmeans_pca = KMeans(
+                n_clusters=i, init='k-means++', random_state=42)
+            kmeans_pca.fit(scores_pca)
+            wcss.append(kmeans_pca.inertia_)
+
+        plt.clf()
+        plt.plot(wcss)
+        plt.show()
+
+        number_of_clusters = int(input("Select the number of clusters: "))
+        return number_of_clusters, kmeans_pca
+
+    def visualize_clusters_3d(Dataframe_filtered_kmeans):
+        xs = Dataframe_filtered_kmeans['component 1']
+        ys = Dataframe_filtered_kmeans['component 2']
+        zs = Dataframe_filtered_kmeans['component 3']
+
+        ax = plt.figure().add_subplot(projection='3d')
+        ax.scatter(xs, ys, zs, c=Dataframe_filtered_kmeans['Segment K-means PCA'])
+
+        plt.show()
+
+    def save_cluster_data(Dataframe_filtered_kmeans, input_file, file_name, number_of_clusters):
+        for i in range(number_of_clusters):
+            cluster = i + 1
+            cluster_data_PCA = Dataframe_filtered_kmeans[
+                Dataframe_filtered_kmeans['Segment K-means PCA'] == i].copy()
+            cluster_data_PCA.rename(columns={list(cluster_data_PCA)[
+                                    0]: 'Article Title'}, inplace=True)
+            input_csv = pd.read_csv(input_file)
+            cluster_original_data = retrieve_metadata_from_title(
+                cluster_data_PCA, "Article Title", input_csv, "Article Title")
+
+            cluster_file_name = f"C:/NLPvenv/NLP/output/csv/{file_name}_cluster_{cluster}.csv"
+            cluster_original_data.to_csv(cluster_file_name, index=False)
+
+    Dataframe_merged = merge_similar_tags_from_dataframe(
+        input_file, output, variables, id, tag_length, number_of_records)
+    Dataframe_filtered = drop_unique_columns(Dataframe_merged)
+
+    if transpose:
+        Dataframe_filtered = Dataframe_filtered.transpose()
+
+    x, pca, num_components_for_80_variance = plot_pca_tags(
+        Dataframe_filtered, n_components_for_variance, show_plots)
+
+    pca = PCA(num_components_for_80_variance)
+    pca.fit(Dataframe_filtered)
+    scores_pca = pca.transform(Dataframe_filtered)
+
+    number_of_clusters, kmeans_pca = perform_kmeans_clustering(
+        scores_pca, max_clusters)
+
+    Dataframe_filtered_kmeans = pd.concat(
+        [Dataframe_filtered.reset_index(), pd.DataFrame(scores_pca)], axis=1)
+    Dataframe_filtered_kmeans.columns.values[-3:] = [
+        'component 1', 'component 2', 'component 3']
+    Dataframe_filtered_kmeans['Segment K-means PCA'] = kmeans_pca.labels_
+
+    if visualize_clusters:
+        visualize_clusters_3d(Dataframe_filtered_kmeans)
+
+    file_path = os.path.basename(input_file)
+    file_name = os.path.splitext(file_path)[0]
+
+    save_cluster_data(Dataframe_filtered_kmeans, input_file,
+                      file_name, number_of_clusters)
+
+    return Dataframe_filtered_kmeans
+

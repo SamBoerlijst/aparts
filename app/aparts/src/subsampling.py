@@ -6,7 +6,7 @@ from scipy.spatial.distance import braycurtis
 from sklearn.cluster import KMeans
 
 
-def generate_binary_item_matrix(CSV_path: str = "", y: str = "keywords", x: str = "title", keyword_length: int = 3, delimiter: str = ", ") -> tuple[pd.DataFrame, list]:
+def generate_binary_item_matrix(CSV_path: str = "", y: str = "keywords", x: str = "title", keyword_length: int = 3, number_of_records: int = "", delimiter: str = ", ") -> tuple[pd.DataFrame, list]:
     """
     Generate a boolean matrix of items by respective tag presence from a csv.
 
@@ -20,6 +20,8 @@ def generate_binary_item_matrix(CSV_path: str = "", y: str = "keywords", x: str 
 
     keyword_length (int): Minimum tag length.
 
+    number_of_records (int): Select only the top n records.
+
     delimiter (str): Separator used to delimit tags.
 
     Returns:
@@ -29,6 +31,9 @@ def generate_binary_item_matrix(CSV_path: str = "", y: str = "keywords", x: str 
     rows_list (list): List of article identifyers.
     """
     dimensions = pd.read_csv(CSV_path)[y]
+    if number_of_records:
+        dimensions = dimensions.head(number_of_records)
+        
     dimensions = dimensions.astype(str).sum()
     dimensions = str(dimensions).split(delimiter)
     dimensions = [item.lstrip(' ').rstrip(' ') for item in dimensions]
@@ -318,10 +323,3 @@ def assign_group(binary_dataframe, item_list):
                 assigned_items.append(item)
                 break
     return assigned_items
-
-
-if __name__ == "__main__":
-    titles = subsample_from_csv(CSV_path="C:/NLPvenv/NLP/output/csv/savedrecs_lianas.csv",
-                                y="Keywords", x="Article Title", n=40, distance_type="dissimilarity")
-    for item in titles:
-        print(item)
