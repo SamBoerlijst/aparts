@@ -10,13 +10,28 @@ from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import StandardScaler
 
-from aparts.src.deduplication import count_tag_occurrence, retrieve_pca_components
-from aparts.src.subsampling import (assign_group, generate_binary_item_matrix, subsample_from_csv,
+from aparts.src.deduplication import count_tag_occurrence
+from aparts.src.subsampling import (assign_group, generate_binary_item_matrix,
                                     transform_dataframe)
 from itertools import product
 
 
 def pca_biplot(X: np.ndarray, y, targets: list, features: list):
+    """
+    Description:
+    -----------
+    Generate a biplot for Principal Component Analysis (PCA) results. This function takes the results of a PCA, including the scaled and reduced data, and creates a biplot for visualizing the relationships between samples and features in a two-dimensional space.
+    
+    Parameters:
+    ----------
+    X (np.ndarray): The input data matrix.
+
+    y (array-like): Class labels or group assignments for each sample.
+
+    targets (list): List of target names or labels corresponding to each class.
+
+    features (list): List of feature names corresponding to each dimension in the input data.
+    """
     X_scaled = StandardScaler().fit_transform(X)
     pca = PCA(n_components=2).fit(X_scaled)
     X_reduced = pca.transform(X_scaled)
@@ -47,11 +62,27 @@ def pca_biplot(X: np.ndarray, y, targets: list, features: list):
     for i, axis in enumerate('xy'):
         getattr(plt, f'{axis}ticks')([])
         getattr(plt, f'{axis}label')(f'PC{i + 1} ({pvars[i]:.2f}%)')
-
     return
 
 
 def pca_tags(CSV: str, variables: str, id: str, tag_length: int, number_of_records: int):
+    """
+    Description
+    -----------
+    Perform Principal Component Analysis (PCA) on tag data and generate a biplot for visualization. This function takes a CSV file containing tag data, performs PCA on a binary item matrix derived from the data, and produces a biplot to visualize the relationships between tags and records in a reduced-dimensional space.
+    
+    Parameters
+    ----------
+    CSV (str): Path to the CSV file containing tag data.
+
+    variables (str): Column name in the CSV file containing tag variables.
+
+    id (str): Column name in the CSV file containing record identifiers.
+
+    tag_length (int): Length of the tag variables.
+
+    number_of_records (int): Number of records to consider for PCA.
+    """
     matrix, id_list = generate_binary_item_matrix(
         CSV, variables, id, tag_length, number_of_records)
     counts = count_tag_occurrence(matrix)
@@ -222,6 +253,21 @@ def expand_query_with_tag_similarity(query, tags, threshold=0.2, top_k=1):
 
 
 def group_synonyms(words, fuzzy_threshold=""):
+    """
+    Description:
+    -----------
+    Group synonyms within a list of words to create logical combinations. This function utilizes WordNet for synonym extraction and allows for optional fuzzy matching to select words with similar meanings. The result is a list of grouped synonyms and individual words.
+    
+    Parameters:
+    ----------
+    words (list of str): List of words to be grouped based on synonyms.
+    
+    fuzzy_threshold (str, optional): The threshold for fuzzy matching. If supplied, words with similarity above this threshold are grouped together. Defaults to an empty string, indicating no fuzzy matching.
+
+    Return:
+    ------
+    grouped_list (list of str): List of grouped synonyms, where each group is represented as a string. Individual words without synonyms are also included in the list.
+    """
     grouped_list = []
     words_without_synonyms = []
 
@@ -488,7 +534,7 @@ def emulate_query(query: str, file_path: str, title_column: str, abstract_column
             f"Unsupported file format for {file_path}. Use CSV or Excel files.")
 
     query_list = query.replace("(", "").replace(")", "").replace(
-        " OR ", "|").replace("*", "").split(" AND ")
+        " OR ", "|").replace("*", "[a-zA-Z]*").split(" AND ")
     query_list = ["(?:"+item+")" for item in query_list]
     query_list = ' AND '.join(query_list).replace(" AND ", ")(?=.*")
     expr = '(?i)(?=.*{})'
@@ -580,7 +626,19 @@ def verify_query(query: str, target_file: str, source_file: str, test_file: str,
 
 
 def generate_query_combinations(items: list) -> list[str]:
-    """Generate all possible combinations from a list"""
+    """
+    Description:
+    -----------
+    Generate all possible combinations from a list using the Cartesian product. This function takes a list of items as input and returns a list of combinations.
+    
+    Parameters:
+    ----------
+    items (list): List of items for which combinations need to be generated.
+
+    Return:
+    ------
+    combinations (list): List of combinations, where each combination is represented as a string.
+    """
     combinations = [' OR '.join(list(set(combination)))
                     for combination in product(items, repeat=len(items))]
 
@@ -600,6 +658,21 @@ def generate_query_combinations(items: list) -> list[str]:
 
 
 def generate_queries(query: str, items: list):
+    """
+    Description:
+    -----------
+    Generate a list of queries by combining the input query with each item in the provided list. The input query is combined with each item using "AND" to form a new query.
+    
+    Parameters:
+    -----------
+    query (str): The base query to which items are appended.
+
+    items (list): List of items to be combined with the query.
+
+    Return:
+    ------
+    query_list (list of str): List of queries generated by combining the input query with each item.
+    """
     query_list = []
     combinations = generate_query_combinations(items)
     for item in combinations:
@@ -612,6 +685,35 @@ def generate_queries(query: str, items: list):
 
 
 def find_optimal_query(query_list, target_file: str, source_file: str, target_title_column: str, source_title_column: str, source_abstract_column: str, max_matches: int) -> tuple[str, int]:
+    """
+    Description:
+    -----------
+    Find the optimal query by iteratively testing different queries and selecting the shortest one with the highest score and the lowest number of mismatches below a specified threshold.
+    
+    Parameters:
+    ----------
+    query_list (list of str): List of queries to be tested.
+
+    target_file (str): Path to the target file for testing the queries.
+
+    source_file (str): Path to the source file for testing the queries.
+
+    target_title_column (str): Column name in the target file containing titles.
+
+    source_title_column (str): Column name in the source file containing titles.
+
+    source_abstract_column (str): Column name in the source file containing abstracts.
+
+    max_matches (int): Maximum number of matches allowed.
+
+    Return:
+    ------
+    best_query (str): The optimal query with the highest score and the lowest number of matches.
+
+    highest_score (float): The highest score among the tested queries.
+
+    lowest_matches (int): The lowest number of matches among the tested queries.
+    """
     highest_score = float('-inf')
     lowest_matches = float('inf')
     best_query = ""
@@ -630,6 +732,23 @@ def find_optimal_query(query_list, target_file: str, source_file: str, target_ti
 
 
 def select_relevant_tags(source_file: str, tag_column: str, record_amount: int) -> list:
+    """
+    Description:
+    -----------
+    Select relevant tags from a specified column in a CSV file.
+
+    Parameters:
+    ----------
+    source_file (str): Path to the CSV file containing the tags.
+
+    tag_column (str): Column name in the CSV file containing tags.
+
+    record_amount (int): Number of records to extract.
+
+    Return:
+    ------
+    tags_list (list of str): List of relevant tags.
+    """
     df = pd.read_csv(source_file)
     tags = df.head(record_amount)[tag_column]
     tags_list = ', '.join(list(tags))
@@ -638,6 +757,43 @@ def select_relevant_tags(source_file: str, tag_column: str, record_amount: int) 
 
 
 def auto_optimize_query(query: str, extra_tags: str, source_file: str, tag_file: str, tag_column: str, record_amount: int, target_file: str, target_title_column: str, source_title_column: str, source_abstract_column: str, max_matches: int):
+    """
+    Description:
+    -----------
+    Automatically optimize the query by iteratively removing words and testing the resulting queries until a satisfactory query is found. It utilizes the find_optimal_query function for testing.
+
+    Parameters:
+    ----------
+    query (str): The initial query to be optimized.
+
+    extra_tags (str): Additional tags to be considered in the optimization process.
+
+    source_file (str): Path to the source file for testing queries.
+
+    tag_file (str): Path to the tag file for selecting relevant tags.
+
+    tag_column (str): Column name in the tag file containing tags.
+
+    record_amount (int): Number of records to consider for tag selection.
+
+    target_file (str): Path to the target file for testing queries.
+
+    target_title_column (str): Column name in the target file containing titles.
+
+    source_title_column (str): Column name in the source file containing titles.
+
+    source_abstract_column (str): Column name in the source file containing abstracts.
+
+    max_matches (int): Maximum number of matches allowed.
+
+    Return:
+    ------
+    best_query (str): The optimized query.
+
+    highest_score (float): The score of the optimized query.
+
+    lowest_matches (int): The number of matches of the optimized query.
+    """
     relevant_tags = []
 
     if record_amount != "":
@@ -706,6 +862,29 @@ def auto_optimize_query(query: str, extra_tags: str, source_file: str, tag_file:
 
 
 def propose_tags(original_query: str, input_file: str, keyword_column: str, trainingset: tuple[int, int], n_tags: int, threshold: float):
+    """
+    Description:
+    -----------
+    Propose a list of tags based on an original query, input file, and specified parameters. It combines pseudo-relevance feedback and similarity feedback to expand the query and suggests tags.
+
+    Parameters:
+    ----------
+    original_query (str): The original query to be expanded.
+
+    input_file (str): Path to the input file for feedback.
+
+    keyword_column (str): Column name in the input file containing keywords.
+
+    trainingset (tuple of int): Tuple representing the percentage of documents to consider as the training set and the remaining as the testing set.
+
+    n_tags (int): Number of tags to propose.
+
+    threshold (float): Threshold for similarity feedback.
+
+    Return:
+    ------
+    merged_terms (list of str): List of proposed tags after merging similar terms.
+    """
     expanded_query1, top_articles = pseudo_relevance_feedback(
         input=input_file, original_query=original_query, trainingset=trainingset, n_tags=n_tags)
     expanded_query2 = similarity_feedback(
@@ -720,7 +899,69 @@ def propose_tags(original_query: str, input_file: str, keyword_column: str, trai
 
 
 def propose_query(original_query: str, input_file: str, keyword_column: str, trainingset: int, n_tags: int, threshold: float, tag_column: str, target_file: str, target_title_column: str, source_title_column: str, source_abstract_column: str, max_matches: int):
+    """
+    Description:
+    -----------
+    Propose an optimized query based on an original query, input file, and specified parameters. It iteratively refines the query by adjusting the training set percentage and utilizing the auto_optimize_query function.
+    
+    Parameters:
+    ----------
+    original_query (str): The original query to be optimized.
+
+    input_file (str): Path to the input file for feedback.
+
+    keyword_column (str): Column name in the input file containing keywords.
+
+    trainingset (int): Initial percentage of documents to consider as the training set.
+
+    n_tags (int): Number of tags to propose.
+
+    threshold (float): Threshold for similarity feedback.
+
+    tag_column (str): Column name in the input file containing tags.
+
+    target_file (str): Path to the target file for testing queries.
+
+    target_title_column (str): Column name in the target file containing titles.
+
+    source_title_column (str): Column name in the input file containing titles.
+
+    source_abstract_column (str): Column name in the input file containing abstracts.
+
+    max_matches (int): Maximum number of matches allowed.
+
+    Return:
+    ------
+    query_dict (dict): Dictionary containing the best query, highest score, and lowest matches for each iteration of the training set percentage.
+    """
     def calculate_best_query(trainingset):
+        """
+        Description:
+        -----------
+        Iteratively determine the best query by adjusting the training set percentage, proposing tags, and optimizing the query.
+        
+        Parameters:
+        ----------
+        trainingset (tuple of int): Tuple representing the percentage of documents to consider as the training set and the remaining as the testing set.
+        
+        original_query (str): The original query to be optimized.
+        
+        input_file (str): Path to the input file for feedback.
+        
+        keyword_column (str): Column name in the input file containing keywords.
+        
+        n_tags (int): Number of tags to propose.
+        
+        threshold (float): Threshold for similarity feedback.
+
+        Return:
+        ------
+        best_query (str): The optimized query for the current training set percentage.
+        
+        highest_score (float): The score of the optimized query.
+        
+        lowest_matches (int): The number of matches of the optimized query.
+        """
         record_amount = round(max_matches*(trainingset[0]/100))
         merged_terms = propose_tags(
             original_query, input_file, keyword_column, trainingset, n_tags, threshold)
