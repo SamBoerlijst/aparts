@@ -460,6 +460,17 @@ def fetch_query_semantic_scholar(query: str, fields: str = "", amount: int = 100
 
 
 def query_to_csv(query: str, output: str, amount: int = 100) -> None:
+    """
+    Fetch data based on a semantic scholar query and save it to a CSV file.
+
+    Parameters:
+    -----------
+    query (str): Semantic Scholar query string.
+    
+    output (str): Path to the output CSV file.
+    
+    amount (int, optional): Number of records to fetch. Default is 100.
+    """
     data = fetch_query_semantic_scholar(query=query, amount=amount)
     dict_to_csv(data, output=output)
     return

@@ -984,3 +984,19 @@ def propose_query(original_query: str, input_file: str, keyword_column: str, tra
         query_dict.setdefault(ingroup, []).append(current)
     print(f"The current best query is: {best_query} with a score of {highest_score}/{lowest_matches}")
     return query_dict
+
+if __name__ == "__main__":
+    # find dominant tags
+    # components = retrieve_pca_components(input_file="C:/NLPvenv/NLP/output/csv/savedrecs_lianas.csv", output="C:/NLPvenv/NLP/output/csv/savedrecs_lianas_sorted_deduplicated.csv", variables="Keywords", id="Article Title", tag_length=4, n_components_for_variance=80, number_of_records=35, show_plots="loading and scree and saturation")
+    # optimize query
+    # query_dict = propose_query(original_query="forest* AND tropic* AND (climber* OR liana* OR vine*) AND (trend* OR change*)", input_file="C:/NLPvenv/NLP/output/csv/lianas_sorted_deduplicated_cluster0.csv", keyword_column='Keywords', trainingset=10, n_tags=30, threshold=0.2,
+    #           tag_column="Keywords", target_file='D:/Users/Sam/Downloads/lianas_oct24.csv', target_title_column='title', source_title_column='Article Title', source_abstract_column='Abstract', max_matches=30)
+    # check new selection
+    for i in range(1, 10):
+        name = f"C:/NLPvenv/NLP/output/csv/savedrecs_lianas_sorted_cluster_{i}.csv"
+        count_title_matches('D:/Users/Sam/Downloads/lianas_oct24.csv', name, 'title', 'Article Title')
+        query_dict = propose_query(original_query="forest* AND tropic* AND (climber* OR liana* OR vine*) AND (trend* OR change*)", input_file=f"C:/NLPvenv/NLP/output/csv/savedrecs_lianas_sorted_cluster_{i}.csv", keyword_column='Keywords', trainingset=50, n_tags=30, threshold=0.2, tag_column="Keywords", target_file='D:/Users/Sam/Downloads/lianas_oct24.csv', target_title_column='title', source_title_column='Article Title', source_abstract_column='Abstract', max_matches=30)
+# subsample
+    # titles = subsample_from_csv(CSV_path="D:/Users/Sam/Downloads/savedrecs(7).csv",
+    #                            y="Keywords", x="Article Title", n=40, distance_type="similarity")
+    # count_title_matches_from_list(file1_path='D:/Users/Sam/Downloads/lianas_oct24.csv', file1_column='title', selected_list=titles,show_score=True)

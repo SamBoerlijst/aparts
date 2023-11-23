@@ -36,13 +36,8 @@ Academic Pdf - Automated Reference Tagging System: Collect keywords from (web of
 blacklist = ["amount", "at http", "at https", "com", "copyright", "female", "male", "nan",
              "number", "net", "org", "parameter", "result", "species", "study", "total", "www"]
 
-# when using nltk for the first time you might need to download the stopword list Using 'from nltk import download' and 'download('stopwords')'
-
-# build lists to store tags and scores
 taglist = []
 scorelist = []
-
-# build folder structure
 
 
 def guarantee_folder_exists(folder: str) -> None:
@@ -58,8 +53,6 @@ def generate_folder_structure() -> None:
     for folder in folders:
         guarantee_folder_exists(folder)
     return
-
-# input sanitization
 
 
 def do_clean(text: str) -> str:
@@ -95,8 +88,6 @@ def clean_keywords(keywords: str) -> list:
     )
     return keywords
 
-# collect keywords from WOS file
-
 
 def get_original_keywords(input_folder:str, records: str, author_given_keywords: str, original_keywords_txt: str) -> None:
     """
@@ -116,16 +107,9 @@ def get_original_keywords(input_folder:str, records: str, author_given_keywords:
     records_path = f"{input_folder}/{records}.csv"
     dataframe = pd.read_csv(records_path)
     author_keywords = str(dataframe[author_given_keywords].to_list())
-
-    # Fix various errors
     author_keywords = do_clean(author_keywords)
-
-    # Convert to list
     author_keywords = clean_keywords(author_keywords)
-
-    # Filter uniques
     author_keywords = list(set(author_keywords))
-
     wos_keywords_original = sorted(list(set(author_keywords)))
 
     with open(original_keywords_txt_path, "w", encoding="utf-8") as file:
@@ -136,11 +120,12 @@ def get_original_keywords(input_folder:str, records: str, author_given_keywords:
     return
 
 
-# collect keywords using bigrams
 def bigram_extraction(records: str, WOScolumn: str, name: str, amount: int, input_folder: str) -> None:
     """
     Determine keywords from the given column for each entry in a csv file using the bigram algorithm. 
 
+    Note: When using nltk for the first time you might need to download the stopword list Using 'from nltk import download' and 'download('stopwords')'
+    
     Parameters:
     -----------
     records (str): Path to the csv containing the Web of Science records.
@@ -163,11 +148,11 @@ def bigram_extraction(records: str, WOScolumn: str, name: str, amount: int, inpu
     data = str(data).encode(encoding="unicode_escape")
     data = gensim.parsing.preprocessing.remove_stopwords(data)
     doc = strip_short(data, minsize=4)
-    # clean input
+
     doc = doc.replace("[", "").replace("]", "").replace("{", "").replace(
         "}", "").replace("<", "").replace(">", "").replace("%", "")
     doc = do_clean(doc).split(",")
-    # NLTK Stop words
+
     stop_words = stopwords.words("english")
     stop_words.extend(["from", "subject", "re", "edu", "use"])
 
@@ -176,18 +161,16 @@ def bigram_extraction(records: str, WOScolumn: str, name: str, amount: int, inpu
         for sentence in sentences:
             yield (
                 gensim.utils.simple_preprocess(str(sentence), deacc=True)
-            )  # deacc=True removes punctuations
+            )
 
     monogram = list(sent_to_words(doc))
-    # Build the bigram and trigram models
     bigram = gensim.models.Phrases(
         monogram, min_count=2, threshold=2, delimiter=" "
-    )  # higher threshold fewer phrases.
+    )
     trigram = gensim.models.Phrases(bigram[monogram], threshold=2)
-    # Faster way to get a sentence clubbed as a trigram/bigram
+
     bigram_mod = gensim.models.phrases.Phraser(bigram)
     trigram_mod = gensim.models.phrases.Phraser(trigram)
-    # Define functions for stopwords, bigrams, trigrams and lemmatization
 
     def remove_stopwords(texts):
         """Remove stopwords from string."""
@@ -205,17 +188,17 @@ def bigram_extraction(records: str, WOScolumn: str, name: str, amount: int, inpu
         """Generate bigrams from list of strings"""
         return [trigram_mod[bigram_mod[doc]] for doc in texts]
 
-    # Remove Stop Words
+
     monogram_nostops = remove_stopwords(monogram)
-    # Form Bigrams
+
     monograms_bigrams = make_bigrams(monogram_nostops)
-    # Create Dictionary
+
     id2word = corpora.Dictionary(monograms_bigrams)
-    # Create Corpus
+
     texts = monograms_bigrams
-    # Term Document Frequency
+
     corpus = [id2word.doc2bow(text) for text in texts]
-    # Build LDA model
+
     lda_model = gensim.models.ldamodel.LdaModel(
         corpus=corpus,
         id2word=id2word,
@@ -227,11 +210,9 @@ def bigram_extraction(records: str, WOScolumn: str, name: str, amount: int, inpu
         alpha="auto",
         per_word_topics=True,
     )
-    # Compute Perplexity
     print(
         "\nPerplexity: ", lda_model.log_perplexity(corpus)
-    )  # a measure of how good the model is. lower the better.
-    #   print(phrase, score)
+    )
     bigram_list = bigram.find_phrases(monogram)
     myKeys = list(bigram_list.keys())
     myVal = list(bigram_list.values())
@@ -245,7 +226,6 @@ def bigram_extraction(records: str, WOScolumn: str, name: str, amount: int, inpu
     return
 
 
-# collect keywords using keybert
 def keybert_extraction(records: str, WOScolumn: str, name: str, amount: int, input_folder: str) -> None:
     """
     Determine keywords from the given column for each entry in a csv file using the keybert algorithm. 
@@ -293,7 +273,6 @@ def keybert_extraction(records: str, WOScolumn: str, name: str, amount: int, inp
     return
 
 
-# collect keywords using RAKE
 def rake_extraction(records: str, WOScolumn: str, name: str, Rake_stoppath: str, amount: int, input_folder: str) -> None:
     """
     Determine keywords from the given column for each entry in a csv file using the RAKE algorithm. 
@@ -346,7 +325,6 @@ def rake_extraction(records: str, WOScolumn: str, name: str, Rake_stoppath: str,
     return
 
 
-# collect keywords using textrank
 def textrank_calculation(text: str, top_n: int = 5, n_gram: int = 3, output_graph: bool = False)-> (tuple[nx.Graph, pd.DataFrame] or pd.DataFrame):
     """
     Determine key-phrases from the provided text using the textrank algorithm. 
@@ -446,7 +424,6 @@ def textrank_extraction(records: str, WOScolumn: str, name: str, amount: int, in
     return
 
 
-# collect keywords using topicrank
 def topicrank_calculation(text:str="", top_n:int=30, n_gram:int = 2) -> pd.DataFrame:
     """
     Determine key-phrases from the provided text using the topicrank algorithm. 
@@ -506,7 +483,6 @@ def topicrank_extraction(records: str, WOScolumn: str, name: str, amount: int, i
     return
 
 
-# collect keywords using tf-idf
 def tf_idf_extraction(records: str, WOScolumn: str, name: str, input_folder: str) -> None:
     """
     Determine keywords from the given column for each entry in a csv file using the TF-IDF algorithm. 
@@ -535,11 +511,11 @@ def tf_idf_extraction(records: str, WOScolumn: str, name: str, input_folder: str
     doc = doc.replace("[", "").replace("]", "").replace("{", "").replace(
         "}", "").replace("<", "").replace(">", "").replace("%", "")
     doc = list(pd.Series(data))
-    # Create the Tokens, Dictionary and Corpus
+
     text_tokens = [[tok for tok in doc.split(",")] for doc in doc]
     mydict = corpora.Dictionary([simple_preprocess(line) for line in doc])
     corpus = [mydict.doc2bow(simple_preprocess(line)) for line in doc]
-    # Create the TF-IDF model
+
     tfidf = models.TfidfModel(corpus, smartirs="ntc")
     for doc in tfidf[corpus]:
         locals()["data_{0}".format(doc)] = pd.DataFrame(
@@ -722,8 +698,7 @@ def extract_tags(records, column, name, Rake_stoppath, amount, input_folder) -> 
     return
 
 
-# construct keylist
-def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile: str = "", output_name: str = "", input_folder:str="", author_given_keywords: str = "", original_keywords_txt:str=""):
+def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile: str = "", output_name: str = "", input_folder: str = "", author_given_keywords: str = "", original_keywords_txt: str = ""):
     """
     Creates a masterlist of keywords from all seven algorithms, any keywords present in the wos file and any keywords present in the bib file, by filtering for unique keywords and filtering by stem.
 
@@ -737,75 +712,126 @@ def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile
     -----------
     None
     """
-    print("constructing keyword list from combined output")
-
-    if bibfile != "":
-        bib_original = pd.read_csv(libtex_csv)["keywords"].tolist()
-    else:
-        bib_original = []
-    if author_given_keywords != "":
-        wos_original = open(f"{input_folder}/{original_keywords_txt}.txt", "r").readlines()
-    else:
-        wos_original = [""]
-    bigram_a = pd.read_csv(f"{input_folder}/bigram_wos_a.csv")["ID"].tolist()
-    bigram_t = pd.read_csv(f"{input_folder}/bigram_wos_t.csv")["ID"].tolist()
-    keybert_a = pd.read_csv(f"{input_folder}/keybert_wos_a.csv")["ID"].tolist()
-    keybert_t = pd.read_csv(f"{input_folder}/keybert_wos_t.csv")["ID"].tolist()
-    TextR_a = pd.read_csv(f"{input_folder}/TextR_wos_a.csv")["ID"].tolist()
-    TextR_t = pd.read_csv(f"{input_folder}/TextR_wos_t.csv")["ID"].tolist()
-    tf_idf_a = pd.read_csv(f"{input_folder}/tf-idf_wos_a.csv")["ID"].tolist()
-    tf_idf_t = pd.read_csv(f"{input_folder}/tf-idf_wos_t.csv")["ID"].tolist()
-    topicR_a = pd.read_csv(f"{input_folder}/topicR_wos_a.csv")["ID"].tolist()
-    topicR_t = pd.read_csv(f"{input_folder}/topicR_wos_t.csv")["ID"].tolist()
-    yake_a = pd.read_csv(f"{input_folder}/yake_wos_a.csv")["ID"].tolist()
-    yake_t = pd.read_csv(f"{input_folder}/yake_wos_t.csv")["ID"].tolist()
-    newlist = list()
-    cor_bigram_a = []
-    cor_bigram_t = []
-    cor_keybert_a = []
-    cor_keybert_t = []
-    cor_TextR_a = []
-    cor_TextR_t = []
-    cor_tf_idf_a = []
-    cor_tf_idf_t = []
-    cor_topicR_a = []
-    cor_topicR_t = []
-    cor_yake_a = []
-    cor_yake_t = []
-    stem_bigram_a = []
-    stem_bigram_t = []
-    stem_keybert_a = []
-    stem_keybert_t = []
-    stem_TextR_a = []
-    stem_TextR_t = []
-    stem_tf_idf_a = []
-    stem_tf_idf_t = []
-    stem_topicR_a = []
-    stem_topicR_t = []
-    stem_yake_a = []
-    stem_yake_t = []
-    stemcor_bigram_t = []
-    stemcor_bigram_a = []
-    stemcor_keybert_a = []
-    stemcor_keybert_t = []
-    stemcor_TextR_a = []
-    stemcor_TextR_t = []
-    stemcor_tf_idf_a = []
-    stemcor_tf_idf_t = []
-    stemcor_topicR_a = []
-    stemcor_topicR_t = []
-    stemcor_yake_a = []
-    stemcor_yake_t = []
-    blacklist1 = re.compile("|".join([re.escape(word) for word in blacklist]))
-    finallist = []
-
-    def filterblacklist(newlist):
-        for i in range(len(newlist)):
-            if fuzz.partial_ratio(newlist[i], blacklist) < 80:
-                finallist.append(newlist[i])
+    def read_files(file_list: list, method_list: list) -> None:
+        """Read data from CSV files based on the provided file_list and store them in lists with names derived from the method_list."""
+        for i in range(len(method_list)):
+            method = method_list[i]
+            file = file_list[i]
+            file_path = f"{input_folder}/{file.split('_')[0]}_wos_{file[-1]}.csv"
+            column_name = 'ID' if 'TextR' not in file else 'n-gram'
+            globals()[method] = pd.read_csv(file_path)[column_name].tolist()
         return
 
-    comparelist = [
+    def generate_empty_lists(method_list: list, prefix_list: list = None):
+        """Generate empty lists with the given method names with optional prefixes."""
+        for item in method_list:
+            if prefix_list:
+                for prefix in prefix_list:
+                    globals()[f"{prefix}{item}"] = []
+            else:
+                globals()[item] = []
+
+    def clean_list(item_list: list) -> list:
+        """Clean up a list by removing unwanted characters and formatting."""
+        keyword_list = item_list
+        null_chars = ['"', "'", "[", "]", "<",
+                      ">", "{", "}", "*", "&", ":", "\\"]
+        space_chars = ["\_", "/", "_"]
+
+        keyword_list = str(sorted(list(set(keyword_list))))
+        keyword_list = [
+            " " if char in space_chars else char for char in item_list if char not in null_chars]
+        keyword_list = "".join(keyword_list).replace(",", ";").split("; ")
+        return keyword_list
+
+    def asciify(source_list: list) -> None:
+        """Convert items in the source list to ASCII characters."""
+        destination_list = []
+        for item in source_list:
+            item = anyascii(str(item))
+            destination_list.append(item)
+        return destination_list
+
+    def filter_by_length(item_list: list) -> None:
+        """Filter out items in a list based on their length."""
+        for item in item_list:
+            test = eval(item)
+            for i in range(len(test)):
+                if not len(test[i]) > 3:
+                    eval(item)[i] = ""
+        return
+
+    def filter_lists_by_stem(method_list: list) -> None:
+        """Apply stemming to items in the given method_list."""
+        ps = PorterStemmer()
+        for item in method_list:
+            test = eval(item)
+            stem = 'stem_' + item
+            cor = 'cor_' + item
+            stemcor = 'stemcor_' + item
+
+            eval(stem).extend(ps.stem(word) for word in test)
+            eval(stemcor).extend(eval(stem)[i] for i in range(
+                len(test)) if eval(stem)[i] not in eval(stemcor))
+            eval(cor).extend(eval(item)[i] for i in range(
+                len(test)) if eval(stem)[i] not in eval(stemcor))
+        return
+
+    def filterblacklist(source_list: list, fuzz_ratio: int = 80) -> None:
+        """Filter out items from the source list based on a fuzziness ratio."""
+        target_list = []
+        for item in source_list:
+            if fuzz.partial_ratio(item, blacklist) < fuzz_ratio:
+                target_list.append(item)
+        return target_list
+
+    def merge_lists(method_list: list) -> tuple[list, list]:
+        """Merge lists from the given method_list and count occurrences."""
+        tag_list = []
+        score_list = []
+        for item in method_list:
+            cor = 'cor_' + item
+            test = eval(cor)
+
+            for value in test:
+                if value in tag_list:
+                    index = tag_list.index(value)
+                    score_list[index] += 1
+                else:
+                    tag_list.append(value)
+                    score_list.append(1)
+        return tag_list, score_list
+
+    def filter_items_by_overlap(tag_list: list, score_list: list, minimum: int, maximum: int) -> dict:
+        """Filter items based on their occurrence counts within a specified range."""
+        tag_matrix = {}
+        output_list = []
+        for i in range(len(score_list)):
+            if score_list[i] >= minimum and score_list[i] <= maximum:
+                tag_matrix.append({tag_list[i], score_list[i]})
+                output_list.append(tag_list[i])
+        return output_list, tag_matrix
+
+    newlist = []
+    finallist = []
+    bib_original = []
+    wos_original = []
+    prefixes = ["cor_", "stem_", "stemcor_"]
+    filelist = [
+        "bigram_a",
+        "bigram_t",
+        "keybert_a",
+        "keybert_t",
+        "TextR_a",
+        "TextR_t",
+        "tf-idf_a",
+        "tf-idf_t",
+        "topicR_a",
+        "topicR_t",
+        "yake_a",
+        "yake_t",
+    ]
+    methodlist = [
         "bigram_a",
         "bigram_t",
         "keybert_a",
@@ -820,89 +846,32 @@ def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile
         "yake_t",
     ]
 
-    # filter by length
-    for item in comparelist:
-        test = eval(item)
-        for i in range(len(test)):
-            if not len(eval(item)[i]) > 3:
-                eval(item)[i] = ""
+    print("constructing keyword list from combined output")
+    read_files(filelist, methodlist)
+    generate_empty_lists(methodlist, prefixes)
+    blacklist1 = re.compile("|".join([re.escape(word) for word in blacklist]))
 
-    # create stem list and filter by stem
-    ps = PorterStemmer()
-    for item in comparelist:
-        test = eval(item)
-        stem = 'stem_' + item
-        for i in range(len(test)):
-            eval(stem).append(ps.stem(test[i]))
-    for item in comparelist:
-        test = eval(item)
-        stem = 'stem_' + item
-        cor = 'cor_' + item
-        stemcor = 'stemcor_' + item
-        for i in range(len(test)):
-            if not eval(stem)[i] in eval(stemcor):
-                eval(stemcor).append(eval(stem)[i])
-                eval(cor).append(eval(item)[i])
+    if bibfile:
+        bib_original = pd.read_csv(libtex_csv)["keywords"].tolist()
 
-    # combine lists
-    for item in comparelist:
-        cor = 'cor_' + item
-        test = eval(cor)
-        for value in test:
-            if value in taglist:
-                for i in taglist:
-                    if i == value:
-                        scorelist[taglist.index(
-                            i)] = scorelist[taglist.index(i)]+1
-            else:
-                taglist.append(value)
-                scorelist.append(1)
-    tagmatrix = []
+    if author_given_keywords:
+        wos_original = open(
+            f"{input_folder}/{original_keywords_txt}.txt", "rb").readlines()
 
-    # filter items that occur in between 2-4 of the lists (common, but not too common)
-    for i in range(len(scorelist)):
-        if scorelist[i] > 1 and scorelist[i] < 5:
-            tagmatrix.append([taglist[i], scorelist[i]])
-            newlist.append(taglist[i])
+    filter_by_length(methodlist)
+    filter_lists_by_stem(methodlist)
+    taglist, scorelist = merge_lists(methodlist)
+    newlist, x = filter_items_by_overlap(taglist, scorelist, 2, 4)
+    woslist = asciify(wos_original)
+    biblist = asciify(bib_original)
+    newlist = newlist + woslist + biblist
+    newlist = clean_list(newlist)
+    finallist = filterblacklist(newlist)
 
-    # append author given keywords and user given keywords
-    for i in range(len(wos_original)):
-        item = str(wos_original[i])
-        item = anyascii(item)
-        newlist.append(item)
-    for i in range(len(bib_original)):
-        item = str(bib_original[i])
-        item = anyascii(item)
-        newlist.append(item)
-
-    # filter uniques and replace special characters
-    newlist = (
-        str(sorted(list(set(newlist))))
-        .replace('"', "")
-        .replace("'", "")
-        .replace(",", ";")
-        .replace("[", "")
-        .replace("]", "")
-        .replace("<", "")
-        .replace(">", "")
-        .replace("{", "")
-        .replace("}", "")
-        .replace("*", "")
-        .replace("&", "and")
-        .replace(":", "")
-        .replace("\\", "")
-        .replace("\_", " ")
-        .replace("/", " ")
-        .replace("_", " ")
-        .split("; ")
-    )
-    # fuzzy search blacklist
-    filterblacklist(newlist)
     finallist = str(sorted(list(set(finallist)))).replace("'", "").split(",")
-    # direct search blacklist
+
     finallist = [word for word in finallist if not blacklist1.search(
         word) and len(word) > 2]
-    # write to csv
     finallist = pd.DataFrame(finallist, columns=["ID"])
     finallist = (
         finallist.sort_values(by="ID", axis=0, ascending=True)
@@ -910,7 +879,7 @@ def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile
         .reset_index(drop=True)
     )
     finallist.to_csv(f"{input_folder}/{output_name}.csv", index=False)
-    return
+    return finallist
 
 
 # complete keylist routine
@@ -945,8 +914,10 @@ def generate_keylist(input_folder="", records="", titlecolumn="Article Title", a
     """
     if author_given_keywords != "":
         get_original_keywords(input_folder=input_folder, records=records, author_given_keywords=author_given_keywords, original_keywords_txt=original_keywords_txt)
+    
     extract_tags(name="wos_t", column=titlecolumn, records=records, Rake_stoppath=Rake_stoppath, amount=amount, input_folder=input_folder)
     extract_tags(name="wos_a", column=abstactcolumn, records=records, Rake_stoppath=Rake_stoppath, amount=amount, input_folder=input_folder)
+    
     if bibfile != "":
         import_bib(bibfile, libtex_csv)
         construct_keylist(blacklist=blacklist, author_given_keywords=author_given_keywords, input_folder=input_folder, output_name=output_name, original_keywords_txt=original_keywords_txt)
@@ -956,5 +927,5 @@ def generate_keylist(input_folder="", records="", titlecolumn="Article Title", a
 
 
 if __name__ == "__main__":
-    generate_keylist(input_folder= "C:/NLPvenv/nlp/input", records="records", bibfile="library", libtex_csv="savedrecs", output_name="keylist", original_keywords_txt="wos_original_tags",
+    generate_keylist(input_folder= "C:/NLPvenv/nlp/input", records="savedrecs_lianas", bibfile="", libtex_csv="savedrecs_lianas_out", output_name="keylist", original_keywords_txt="wos_original_tags",
                      author_given_keywords="Author Keywords", Rake_stoppath="C:/NLPvenv/RAKE/data/stoplists/SmartStoplist.txt")

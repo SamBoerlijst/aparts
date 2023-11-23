@@ -15,6 +15,23 @@ matplotlib.use('TkAgg')
 
 
 def group_tags_by_dissimilarity(dissimilarity_matrix: np.ndarray, tag_names: list, threshold: float = 0.5, print_output: bool = False) -> list:
+    """
+    Group tags based on dissimilarity using Agglomerative Clustering.
+
+    Parameters:
+    -----------
+    dissimilarity_matrix (np.ndarray): Matrix containing dissimilarity values between tags.
+    
+    tag_names (list): List of tag names corresponding to the dissimilarity matrix.
+    
+    threshold (float, optional): Distance threshold for clustering. Default is 0.5.
+    
+    print_output (bool, optional): Flag to print additional output. Default is False.
+
+    Return:
+    -----------
+    nnamed_groups (list): List of groups, where each group is a list of tag names with low dissimilarity.
+    """
     clustering = AgglomerativeClustering(
         n_clusters=None, linkage='average', distance_threshold=threshold, metric='precomputed')
     clusters = clustering.fit_predict(dissimilarity_matrix)
@@ -37,6 +54,17 @@ def group_tags_by_dissimilarity(dissimilarity_matrix: np.ndarray, tag_names: lis
 
 
 def generate_tag_dissimilarity(dataframe: pd.DataFrame) -> np.ndarray:
+    """
+    Generate a dissimilarity matrix for tags based on binary presence/absence in a DataFrame.
+
+    Parameters:
+    -----------
+    dataframe (pd.DataFrame): DataFrame containing binary information for tag presence/absence.
+
+    Return:
+    -----------
+    np.ndarray: Dissimilarity matrix calculated using Bray-Curtis distance.
+    """
     binary_dataframe = dataframe.astype(int)
     matrix = binary_dataframe.values
     dissimilarity_matrix = pairwise_distances(matrix.T, metric='braycurtis')
@@ -250,6 +278,17 @@ def merge_similar_tags_from_dataframe(input_file: str, output: str, variables: s
 
 
 def count_tag_occurrence(dataframe: pd.DataFrame) -> np.array:
+    """
+    Count the occurrence of tags in a binary DataFrame.
+
+    Parameters:
+    -----------
+    dataframe (pd.DataFrame): DataFrame containing binary information for tag presence/absence.
+
+    Return:
+    -----------
+    np.array: Array of tuples containing tag names and their corresponding occurrence counts.
+    """
     # Assuming the binary columns start from column index 1
     binary_columns = dataframe.columns[1:]
 
@@ -284,6 +323,21 @@ def drop_unique_columns(Dataframe: pd.DataFrame) -> pd.DataFrame:
 
 
 def plot_pca_tags(data: pd.DataFrame, n_components_for_variance: int = 0, show_plots: str = "") -> tuple[list[str], PCA, int]:
+    """
+    Perform Principal Component Analysis (PCA) on tag data and plot the results.
+
+    Parameters:
+    -----------
+    data (pd.DataFrame): DataFrame containing tag data.
+
+    n_components_for_variance (int, optional): Number of components to retain for variance analysis. Default is 0.
+
+    show_plots (str, optional): Flag to specify which plots to display. Default is an empty string.
+
+    Return:
+    -----------
+    tuple: A tuple containing a list of group names, PCA model, and the number of components for 80% variance.
+    """
     column_names = list(data.columns)
     # You need to define assign_group function
     groups = assign_group(data, column_names)
@@ -302,6 +356,17 @@ def plot_pca_tags(data: pd.DataFrame, n_components_for_variance: int = 0, show_p
     num_components_for_95_variance = np.argmax(cumulative_variance >= 0.95) + 1
 
     def plots(show_plots):
+        """
+        Display multiple plots based on user-selected options.
+
+        Parameters:
+        -----------
+        show_plots (str): String containing user-selected plots separated by "and".
+
+        Return:
+        -----------
+        None
+        """
         plot_mapping = {
             "scree": {"function": plot_scree},
             "saturation": {"function": plot_saturation},
@@ -331,6 +396,13 @@ def plot_pca_tags(data: pd.DataFrame, n_components_for_variance: int = 0, show_p
         plt.show()
 
     def plot_scree(ax):
+        """
+        Plot the scree plot showing explained variance ratios for each principal component.
+
+        Parameters:
+        -----------
+        ax: Matplotlib axis.
+        """
         ax.plot(range(1, len(explained_variance_ratio) + 1),
                 explained_variance_ratio, marker='o')
         ax.set_xlabel('Principal Component')
@@ -338,6 +410,13 @@ def plot_pca_tags(data: pd.DataFrame, n_components_for_variance: int = 0, show_p
         ax.set_title('Scree Plot')
 
     def plot_saturation(ax):
+        """
+        Plot the saturation plot showing cumulative explained variance.
+
+        Parameters:
+        -----------
+        ax: Matplotlib axis.
+        """
         ax.plot(range(1, len(cumulative_variance) + 1),
                 cumulative_variance, marker='o', color='r')
         ax.set_xlabel('Number of Principal Components')
@@ -347,6 +426,13 @@ def plot_pca_tags(data: pd.DataFrame, n_components_for_variance: int = 0, show_p
                 s=f"Number of components needed for 95% explained variance: {num_components_for_95_variance}")
 
     def plot_loading(ax):
+        """
+        Plot the loading plot showing the contribution of features to principal components.
+
+        Parameters:
+        -----------
+        ax: Matplotlib axis.
+        """
         loading_matrix = pca.components_.T * np.sqrt(pca.explained_variance_)
         for i, feature in enumerate(features):
             ax.arrow(0, 0, loading_matrix[i, 0],
@@ -360,6 +446,17 @@ def plot_pca_tags(data: pd.DataFrame, n_components_for_variance: int = 0, show_p
         ax.set_title('Loading Plot')
 
     def find_contributing_tags(components: int):
+        """
+        Find the main contributing tags explaining a specified percentage variance.
+
+        Parameters:
+        -----------
+        components (int): Percentage of explained variance.
+
+        Return:
+        -----------
+        list: List of main contributing tags.
+        """
         loading_matrix = pca.components_.T * np.sqrt(pca.explained_variance_)
         main_tags = []
         for loading in loading_matrix:
@@ -387,6 +484,31 @@ def plot_pca_tags(data: pd.DataFrame, n_components_for_variance: int = 0, show_p
 
 
 def retrieve_pca_components(input_file: str, output: str, variables: str, id: str, tag_length: int,  number_of_records: int, n_components_for_variance: int, show_plots: str):
+    """
+    Retrieve principal components after merging similar tags, dropping unique columns, and performing PCA.
+
+    Parameters:
+    -----------
+    input_file (str): Path to the input file.
+    
+    output (str): Path to the output file.
+    
+    variables (str): Variable names in the input file.
+    
+    id (str): Identifier column name.
+    
+    tag_length (int): Length of tags to consider for merging.
+    
+    number_of_records (int): Number of records to consider.
+    
+    n_components_for_variance (int): Number of components to retain for variance analysis.
+    
+    show_plots (str): String containing user-selected plots separated by "and".
+
+    Return:
+    -----------
+    list: List of principal components.
+    """
     Dataframe_merged = merge_similar_tags_from_dataframe(
         input_file, output, variables, id, tag_length, number_of_records)
     Dataframe_filtered = drop_unique_columns(Dataframe_merged)
@@ -396,7 +518,39 @@ def retrieve_pca_components(input_file: str, output: str, variables: str, id: st
 
 
 def retrieve_clusters(input_file: str, output: str, variables: str, id: str, tag_length: int, number_of_records: int, n_components_for_variance: int, show_plots: str, transpose: bool = False, label: bool = False, max_clusters: int = 20, visualize_clusters:bool = False) -> pd.DataFrame:
+    """
+    Retrieve clusters of source documents by tag similarity via performing PCA and k-means clustering.
 
+    Parameters:
+    -----------
+    input_file (str): Path to the input file.
+    
+    output (str): Path to the output file.
+    
+    variables (str): Variable names in the input file.
+    
+    id (str): Identifier column name.
+    
+    tag_length (int): Length of tags to consider for merging.
+    
+    number_of_records (int): Number of records to consider.
+    
+    n_components_for_variance (int): Number of components to retain for variance analysis.
+    
+    show_plots (str): String containing user-selected plots separated by "and".
+    
+    transpose (bool, optional): Flag to transpose the DataFrame. Default is False.
+    
+    label (bool, optional): Flag to label the clusters. Default is False.
+    
+    max_clusters (int, optional): Maximum number of clusters for k-means. Default is 20.
+    
+    visualize_clusters (bool, optional): Flag to visualize clusters in 3D. Default is False.
+
+    Return:
+    -----------
+    pd.DataFrame: DataFrame containing clustered data.
+    """
     def retrieve_metadata_from_title(dataframe_a: pd.DataFrame, title_col_a: str, dataframe_b: pd.DataFrame, title_col_b: str) -> pd.DataFrame:
         "Return all data for each row in dataframe_b that has a matching title in dataframe_a"
         merged_df = pd.merge(dataframe_a[title_col_a], dataframe_b,
@@ -420,6 +574,13 @@ def retrieve_clusters(input_file: str, output: str, variables: str, id: str, tag
         return number_of_clusters, kmeans_pca
 
     def visualize_clusters_3d(Dataframe_filtered_kmeans):
+        """
+        Visualize clusters in 3D space based on PCA components.
+
+        Parameters:
+        -----------
+        Dataframe_filtered_kmeans (pd.DataFrame): DataFrame containing PCA components and cluster labels.
+        """
         xs = Dataframe_filtered_kmeans['component 1']
         ys = Dataframe_filtered_kmeans['component 2']
         zs = Dataframe_filtered_kmeans['component 3']
@@ -429,7 +590,20 @@ def retrieve_clusters(input_file: str, output: str, variables: str, id: str, tag
 
         plt.show()
 
-    def save_cluster_data(Dataframe_filtered_kmeans, input_file, file_name, number_of_clusters):
+    def save_cluster_data(Dataframe_filtered_kmeans, input_file, file_name, number_of_clusters) -> None:
+        """
+        Save cluster data to separate CSV files for each cluster.
+
+        Parameters:
+        -----------
+        Dataframe_filtered_kmeans (pd.DataFrame): DataFrame containing PCA components and cluster labels.
+        
+        input_file (str): Path to the input file.
+        
+        file_name (str): Base name for the output CSV files.
+        
+        number_of_clusters (int): Number of clusters.
+        """
         for i in range(number_of_clusters):
             cluster = i + 1
             cluster_data_PCA = Dataframe_filtered_kmeans[
