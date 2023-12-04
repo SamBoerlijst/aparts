@@ -1,4 +1,5 @@
 import os
+import re
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,14 +17,27 @@ from aparts.src.subsampling import (assign_group, generate_binary_item_matrix,
 from itertools import product
 
 
+def import_df(filepath:str)->pd.DataFrame:
+    """import csv or xlsx file based on filepath"""
+    file_extension = filepath.split('.')[-1]
+    if file_extension == 'csv':
+        df = pd.read_csv(filepath)
+    elif file_extension in ['xls', 'xlsx']:
+        df = pd.read_excel(filepath)
+    else:
+        raise ValueError(
+            f"Unsupported file format for {filepath}. Use DataFrame, CSV or Excel files.")
+    return df
+
+
 def pca_biplot(X: np.ndarray, y, targets: list, features: list):
     """
     Description:
-    -----------
+    ------------
     Generate a biplot for Principal Component Analysis (PCA) results. This function takes the results of a PCA, including the scaled and reduced data, and creates a biplot for visualizing the relationships between samples and features in a two-dimensional space.
-    
+
     Parameters:
-    ----------
+    -----------
     X (np.ndarray): The input data matrix.
 
     y (array-like): Class labels or group assignments for each sample.
@@ -70,7 +84,7 @@ def pca_tags(CSV: str, variables: str, id: str, tag_length: int, number_of_recor
     Description
     -----------
     Perform Principal Component Analysis (PCA) on tag data and generate a biplot for visualization. This function takes a CSV file containing tag data, performs PCA on a binary item matrix derived from the data, and produces a biplot to visualize the relationships between tags and records in a reduced-dimensional space.
-    
+
     Parameters
     ----------
     CSV (str): Path to the CSV file containing tag data.
@@ -212,7 +226,7 @@ def group_fuzzy_words(word_list: list[str], threshold: int = 80):
     return list(grouped_words)
 
 
-def expand_query_with_tag_similarity(query, tags, threshold=0.2, top_k=1):
+def expand_query_with_tag_similarity(query: str, tags: set, threshold: float = 0.2, top_k: int = 1, batch_size: int = 20):
     """
     Expand a query based on tag similarity.
 
@@ -234,38 +248,47 @@ def expand_query_with_tag_similarity(query, tags, threshold=0.2, top_k=1):
         tags = list(tags)
 
     vectorizer = TfidfVectorizer()
-    tag_matrix = vectorizer.fit_transform(tags)
-    query_vec = vectorizer.transform([query])
-    query_vec = query_vec.toarray()
-    tag_similarity = cosine_similarity(query_vec, tag_matrix)
+    num_batches = len(tags) // batch_size + (len(tags) % batch_size > 0)
+    expanded_terms = []
 
-    if tag_similarity.shape[0] == 0:
-        return [query]
+    for i in range(num_batches):
+        batch_start = i * batch_size
+        batch_end = (i + 1) * batch_size
+        batch_tags = tags[batch_start:batch_end]
 
-    tag_similarity = tag_similarity[0]
+        tag_matrix = vectorizer.fit_transform(batch_tags)
+        query_vec = vectorizer.transform([query])
+        query_vec = query_vec.toarray()
+        tag_similarity = cosine_similarity(query_vec, tag_matrix)
 
-    sorted_indices = np.argsort(tag_similarity)[::-1]
-    sorted_terms = [tags[i] for i in sorted_indices]
+        if tag_similarity.shape[0] == 0:
+            return [query]
 
-    expanded_terms = [term for term in sorted_terms if tag_similarity[tags.index(
-        term)] > threshold][:top_k]
+        tag_similarity = tag_similarity[0]
+
+        sorted_indices = np.argsort(tag_similarity)[::-1]
+        sorted_terms = [batch_tags[i] for i in sorted_indices]
+
+        expanded_terms.extend(
+            [term for term in sorted_terms if tag_similarity[batch_tags.index(term)] > threshold][:top_k])
+
     return expanded_terms
 
 
 def group_synonyms(words, fuzzy_threshold=""):
     """
     Description:
-    -----------
+    ------------
     Group synonyms within a list of words to create logical combinations. This function utilizes WordNet for synonym extraction and allows for optional fuzzy matching to select words with similar meanings. The result is a list of grouped synonyms and individual words.
-    
+
     Parameters:
-    ----------
+    -----------
     words (list of str): List of words to be grouped based on synonyms.
-    
+
     fuzzy_threshold (str, optional): The threshold for fuzzy matching. If supplied, words with similarity above this threshold are grouped together. Defaults to an empty string, indicating no fuzzy matching.
 
     Return:
-    ------
+    -------
     grouped_list (list of str): List of grouped synonyms, where each group is represented as a string. Individual words without synonyms are also included in the list.
     """
     grouped_list = []
@@ -307,7 +330,7 @@ def group_synonyms(words, fuzzy_threshold=""):
     return grouped_list
 
 
-def similarity_feedback(input: str, original_query: str = "Culex pipiens AND population dynamics", keyword_column: str = 'keywords', threshold: float = 0.2, top_k: int = 3) -> list[str]:
+def similarity_feedback(original_query: str = "Culex pipiens AND population dynamics", keyword_column: str = 'keywords', threshold: float = 0.2, top_k: int = 3, input_path: str = "", ingroup: pd.DataFrame = "") -> list[str]:
     """
     Expand a query based on tag co-occurrence in the source csv.
 
@@ -327,7 +350,10 @@ def similarity_feedback(input: str, original_query: str = "Culex pipiens AND pop
     -----------
     expanded_query (str): The expanded query with similar tags added.
     """
-    df = pd.read_csv(input)
+    if input_path:
+        df = pd.read_csv(input_path)
+    else:
+        df = ingroup
     df = df.dropna(subset=[keyword_column])
     tags = set(df[keyword_column].tolist())
     vectorizer = CountVectorizer()
@@ -337,82 +363,121 @@ def similarity_feedback(input: str, original_query: str = "Culex pipiens AND pop
     return expanded_query
 
 
-def pseudo_relevance_feedback(input: str, original_query: str, trainingset: tuple[int, int] = (50, 20), n_tags: int = 10, n_articles: int = 20, print_weights: bool = False) -> list[str]:
+def pseudo_relevance_feedback(original_query: str, n_tags: int = 10, n_articles: int = 20, print_weights: bool = False, input_file: str = None, ingroup: pd.DataFrame = None, outgroup: pd.DataFrame = None, batch_size: int = 20) -> list[str]:
     """
     Perform pseudo-relevance feedback on a collection of documents using the Rocchio algorithm on TF-IDF weights.
 
     Parameters:
     -----------
-    inputCSV (str): Path to the CSV file containing the document items (title and abstract) to scan.
 
     original_query (str): The original query string for retrieval.
-
-    trainingset (tuple): A tuple specifying the percentage of documents to use as the "good" and "bad" training sets (ingroup and outgroup). The ingroup is taken from the top, the outgroup from the bottom.
 
     n_tags (int): Number of top relevant tags to keep for query expansion.
 
     n_articles (int): Number of top relevant articles to display.
 
+    input_file (str): Path to the CSV file containing the document items (title and abstract) to scan.
+
+    ingroup (pd.DataFrame): Optional, Data containing the items that should be represented.
+
+    outgroup (pd.DataFrame):  Optional, Data containing the items that should be represented.
+
     Returns:
     -----------
     updated_query_str (str): The updated query string after pseudo-relevance feedback.
     """
-    df = pd.read_csv(input)
-    ingroup, outgroup = trainingset
-    length = df.shape[0]
-    ingroup_records = int((ingroup/100) * length)
-    outgroup_records = int((outgroup/100) * length)
-    good_matches = df.head(ingroup_records).copy()
-    bad_matches = df.tail(outgroup_records).copy()
+    def load_data(input_file, trainingset):
+        sourcefile = pd.read_csv(input_file)
+        matches, non_matches = trainingset
+        length = sourcefile.shape[0]
+        ingroup_records = int((matches / 100) * length)
+        outgroup_records = int((non_matches / 100) * length)
+        ingroup = sourcefile.head(ingroup_records).copy()
+        outgroup = sourcefile.tail(outgroup_records).copy()
+        df = pd.concat([ingroup, outgroup], ignore_index=True)
+        return df, ingroup, outgroup
 
-    good_matches['tags_str'] = good_matches['Keywords']
-    bad_matches['tags_str'] = bad_matches['Keywords']
+    def process_batch(tfidf_vectorizer, updated_query_array, batch_df):
+        batch_df = batch_df.dropna(subset=['Keywords'])
+
+        if not batch_df.empty:
+            tfidf_matrix_batch = tfidf_vectorizer.transform(
+                batch_df['Keywords'])
+            cosine_similarities_batch = cosine_similarity(
+                updated_query_array, tfidf_matrix_batch)
+            batch_df.loc[:, 'cosine_similarity'] = cosine_similarities_batch[0].copy()
+
+        return batch_df
+
+    def calculate_updated_query(tfidf_vectorizer: any, original_query: str, ingroup: pd.DataFrame, outgroup: pd.DataFrame):
+        alpha = 1.0
+        beta = 0.75
+        gamma = 0.25
+
+        tfidf_matrix = tfidf_vectorizer.fit_transform(
+            pd.concat([ingroup, outgroup], ignore_index=True)['Keywords'])
+        expanded_query_vector = tfidf_vectorizer.transform([original_query])
+        updated_query = alpha * expanded_query_vector + beta * \
+            np.mean(tfidf_matrix[ingroup.index, :], axis=0) - \
+            gamma * np.mean(tfidf_matrix[outgroup.index, :], axis=0)
+        updated_query_array = np.asarray(updated_query)
+
+        return updated_query_array
+
+    def get_top_relevant_tags(tfidf_vectorizer, updated_query_array, n_tags=5, print_weights=False):
+        updated_query_tags = tfidf_vectorizer.inverse_transform(updated_query_array)[
+            0]
+        relevant_tags = [(tag, weight) for tag, weight in zip(
+            updated_query_tags, updated_query_array[0])]
+        relevant_tags.sort(key=lambda x: x[1], reverse=True)
+        top_relevant_tags = [tag for tag, _ in relevant_tags][:n_tags]
+
+        if print_weights:
+            print("Relevant Tags with TF-IDF Weights:")
+            for tag, weight in relevant_tags[:n_tags]:
+                print(f"{tag}: {weight}")
+
+        return top_relevant_tags
+
+    def batch_process(df, tfidf_vectorizer, updated_query_array, batch_size=100):
+        batch_start = 0
+        df_new = pd.DataFrame()
+        while batch_start < df.shape[0]:
+            batch_end = min(batch_start + batch_size, df.shape[0])
+            batch_df = df.iloc[batch_start:batch_end].copy()
+            batch_df_new = process_batch(
+                tfidf_vectorizer, updated_query_array, batch_df)
+            df_new = pd.concat([df_new, batch_df_new])
+            batch_start += batch_size
+        return df_new
+
+    if input_file and ingroup == None:
+        raise ValueError(
+            "Please supply either input file and trainingset or ingroup and outgroup")
+
+    df = pd.concat([ingroup, outgroup], ignore_index=True)
 
     tfidf_vectorizer = TfidfVectorizer()
-    tfidf_matrix = tfidf_vectorizer.fit_transform(df['Keywords'])
-
-    centroid_good = np.mean(tfidf_matrix[:ingroup], axis=0)
-    centroid_bad = np.mean(tfidf_matrix[-outgroup:], axis=0)
-
-    alpha = 1.0
-    beta = 0.75
-    gamma = 0.25
-
-    expanded_query_vector = tfidf_vectorizer.transform([original_query])
-    updated_query = alpha * expanded_query_vector + \
-        beta * centroid_good - gamma * centroid_bad
-    updated_query_array = np.asarray(updated_query)
-    updated_query_tags = tfidf_vectorizer.inverse_transform(updated_query_array)[
-        0]
-
-    relevant_tags = [(tag, weight) for tag, weight in zip(
-        updated_query_tags, updated_query_array[0])]
-    relevant_tags.sort(key=lambda x: x[1], reverse=True)
-    top_relevant_tags = [tag for tag, _ in relevant_tags][:n_tags]
-
-    if print_weights:
-        print("Relevant Tags with TF-IDF Weights:")
-        for tag, weight in relevant_tags[:n_tags]:
-            print(f"{tag}: {weight}")
-
-    cosine_similarities = cosine_similarity(updated_query_array, tfidf_matrix)
-
-    df['cosine_similarity'] = cosine_similarities[0]
+    updated_query_array = calculate_updated_query(
+        tfidf_vectorizer, original_query, ingroup, outgroup)
+    top_relevant_tags = get_top_relevant_tags(
+        tfidf_vectorizer, updated_query_array, n_tags, print_weights)
+    df = batch_process(df, tfidf_vectorizer, updated_query_array, batch_size)
     df = df.sort_values(by='cosine_similarity', ascending=False)
-
     top_articles = df.head(n_articles)
+
     return top_relevant_tags, top_articles
 
 
-def count_title_matches(file1_path, file2_path, file1_column, file2_column, show_missing: bool = False):
+def count_title_matches(file1: pd.DataFrame, file2: pd.DataFrame, file1_column: str, file2_column: str, show_missing: bool = False):
     """
     Count the number of matching titles between two files.
 
     Parameters:
     -----------
-    file1_path (str): Path to the first file.
+    file1 (pd.Dataframe): Dataframe of the first file.
 
-    file2_path (str): Path to the second file.
+    file2 (pd.DataFrame): Dataframe of the second file.
 
     file1_column (str): Column containing titles in the first file.
 
@@ -424,24 +489,28 @@ def count_title_matches(file1_path, file2_path, file1_column, file2_column, show
     -----------
     None
     """
-    file1_extension = file1_path.split('.')[-1]
-    file2_extension = file2_path.split('.')[-1]
-
-    if file1_extension == 'csv':
-        df1 = pd.read_csv(file1_path)
-    elif file1_extension in ['xls', 'xlsx']:
-        df1 = pd.read_excel(file1_path)
-    else:
-        raise ValueError(
-            f"Unsupported file format for {file1_path}. Use CSV or Excel files.")
-
-    if file2_extension == 'csv':
-        df2 = pd.read_csv(file2_path)
-    elif file2_extension in ['xls', 'xlsx']:
-        df2 = pd.read_excel(file2_path)
-    else:
-        raise ValueError(
-            f"Unsupported file format for {file2_path}. Use CSV or Excel files.")
+    if type(file1) == pd.DataFrame:
+        df1 = file1
+    elif type(file1) == str:
+        file1_extension = file1.split('.')[-1]
+        if file1_extension == 'csv':
+            df1 = pd.read_csv(file1)
+        elif file1_extension in ['xls', 'xlsx']:
+            df1 = pd.read_excel(file1)
+        else:
+            raise ValueError(
+                f"Unsupported file format for {file1}. Use dataframe or path to CSV or Excel files.")
+    if type(file2) == pd.DataFrame:
+        df2 = file2
+    elif type(file2) == str:
+        file2_extension = file2.split('.')[-1]
+        if file2_extension == 'csv':
+            df2 = pd.read_csv(file2)
+        elif file2_extension in ['xls', 'xlsx']:
+            df2 = pd.read_excel(file2)
+        else:
+            raise ValueError(
+                f"Unsupported file format for {file2}. Use CSV or Excel files.")
 
     titles1 = df1[file1_column].astype(str)
     titles2 = df2[file2_column].astype(str)
@@ -460,13 +529,13 @@ def count_title_matches(file1_path, file2_path, file1_column, file2_column, show
     return match_count, total_titles2
 
 
-def count_title_matches_from_list(file1_path: str, selected_list: list, file1_column: str, show_missing: bool = False, show_score: bool = False):
+def count_title_matches_from_list(file: pd.DataFrame, selected_list: list, file1_column: str, show_missing: bool = False, show_score: bool = False):
     """
     Count the number of matching titles between a file and a selected list of titles.
 
     Parameters:
     -----------
-    file1_path (str): Path to the file.
+    file (pd.DataFrame): Data containing records or path to it (csv or xls(x)).
 
     selected_list (list): List of titles for comparison.
 
@@ -478,17 +547,7 @@ def count_title_matches_from_list(file1_path: str, selected_list: list, file1_co
     -----------
     None
     """
-    file1_extension = file1_path.split('.')[-1]
-
-    if file1_extension == 'csv':
-        df1 = pd.read_csv(file1_path)
-    elif file1_extension in ['xls', 'xlsx']:
-        df1 = pd.read_excel(file1_path)
-    else:
-        raise ValueError(
-            f"Unsupported file format for {file1_path}. Use CSV or Excel files.")
-
-    titles1 = df1[file1_column].astype(str)
+    titles1 = file[file1_column].astype(str)
     titles2 = selected_list
 
     match_count = titles1.isin(titles2).sum()
@@ -506,7 +565,7 @@ def count_title_matches_from_list(file1_path: str, selected_list: list, file1_co
     return match_count
 
 
-def emulate_query(query: str, file_path: str, title_column: str, abstract_column: str) -> list:
+def emulate_query(query: str, df: pd.DataFrame, title_column: str, abstract_column: str) -> list:
     """
     Emulate a query on a dataframe based on title and abstract columns.
 
@@ -514,7 +573,7 @@ def emulate_query(query: str, file_path: str, title_column: str, abstract_column
     -----------
     query (str): Query string to emulate.
 
-    file_path (str): Path to the file containing data.
+    df (pd.DataFrame): Data containing records.
 
     title_column (str): Column containing titles in the file.
 
@@ -524,22 +583,12 @@ def emulate_query(query: str, file_path: str, title_column: str, abstract_column
     -----------
     filtered_titles (list): List of titles matching the query.
     """
-    file_extension = file_path.split('.')[-1]
-    if file_extension == 'csv':
-        df = pd.read_csv(file_path)
-    elif file_extension in ['xls', 'xlsx']:
-        df = pd.read_excel(file_path)
-    else:
-        raise ValueError(
-            f"Unsupported file format for {file_path}. Use CSV or Excel files.")
-
     query_list = query.replace("(", "").replace(")", "").replace(
         " OR ", "|").replace("*", "[a-zA-Z]*").split(" AND ")
     query_list = ["(?:"+item+")" for item in query_list]
     query_list = ' AND '.join(query_list).replace(" AND ", ")(?=.*")
     expr = '(?i)(?=.*{})'
     regex_pattern = r'^{}'.format(''.join(expr.format(query_list)))
-
     title_matches = df[title_column].str.contains(
         regex_pattern, regex=True, case=False)
     abstract_matches = df[abstract_column].str.contains(
@@ -551,7 +600,7 @@ def emulate_query(query: str, file_path: str, title_column: str, abstract_column
     return filtered_titles
 
 
-def test_query(query: str, target_file: str, source_file: str, target_title_column: str, source_title_column: str, source_abstract_column: str) -> list:
+def test_query(query: str, target_file: pd.DataFrame, source_file: pd.DataFrame, target_title_column: str, source_title_column: str, source_abstract_column: str) -> tuple[int, int, list]:
     """
     Test overlap for a given query in a source file against a target file.
 
@@ -559,9 +608,9 @@ def test_query(query: str, target_file: str, source_file: str, target_title_colu
     -----------
     query (str): The query string to be verified.
 
-    target_file (str): Path to the target file containing the records that should be matched.
+    target_file (pd.DataFrame): Records that should be matched.
 
-    source_file (str): Path to the source file containing the records to be searched.
+    source_file (pd.DataFrame): Records to be searched.
 
     test_file (str): Path to the test file acquired from a search engine using the same query.
 
@@ -573,7 +622,11 @@ def test_query(query: str, target_file: str, source_file: str, target_title_colu
 
     Returns:
     -----------
-    filtered_titles (list): List of titles matching the query in the test file.
+    score (int): number of target matches.
+
+    filtered_titles (int): Number of source titles matching the queries
+
+    filtered_titles (list): List of source titles matching the query in the test file.
 
     Example:
     -----------
@@ -616,31 +669,37 @@ def verify_query(query: str, target_file: str, source_file: str, test_file: str,
     -----------
     verify_query(query = "forest* AND (tropic* OR neotropic*) AND (climber* OR liana* OR vine*) AND (trend* OR change*) AND (ground OR climate OR hyperspectral OR accretion OR precipitation OR reproduction OR environmental)", target_file='D:/Users/Sam/Downloads/lianas_oct24.csv', source_file='D:/Users/Sam/Downloads/lianas_original.xls', test_file='D:/Users/Sam/Downloads/savedrecs(6).xls', target_title_column='title', test_title_column='Article Title', source_title_column='Article Title', source_abstract_column='Abstract')
     """
+    source = import_df(source_file)
+    target = import_df(target_file)
     filtered_titles = emulate_query(
-        query, source_file, source_title_column, source_abstract_column)
-    count_title_matches_from_list(
-        target_file, filtered_titles, target_title_column)
-    count_title_matches(target_file, test_file,
-                        target_title_column, test_title_column)
-    return filtered_titles
+        query, source, source_title_column, source_abstract_column)
+    score = count_title_matches_from_list(
+        target, filtered_titles, target_title_column)
+    matches = count_title_matches(target, test_file,
+                                  target_title_column, test_title_column)
+    return score, matches, filtered_titles
 
 
 def generate_query_combinations(items: list) -> list[str]:
     """
     Description:
-    -----------
-    Generate all possible combinations from a list using the Cartesian product. This function takes a list of items as input and returns a list of combinations.
-    
+    ------------
+    Generate all possible combinations from a list using the Cartesian product.
+    This function takes a list of items as input and returns a list of combinations.
+
     Parameters:
-    ----------
+    -----------
     items (list): List of items for which combinations need to be generated.
 
     Return:
-    ------
+    -------
     combinations (list): List of combinations, where each combination is represented as a string.
     """
-    combinations = [' OR '.join(list(set(combination)))
-                    for combination in product(items, repeat=len(items))]
+    combinations = []
+
+    for r in range(1, len(items) + 1):
+        for combination in product(items, repeat=r):
+            combinations.append(' OR '.join(combination))
 
     combinations = [
         f'({combination})' for combination in combinations if ' OR ' in combination]
@@ -654,29 +713,35 @@ def generate_query_combinations(items: list) -> list[str]:
 
     combinations.extend(and_combinations)
     combinations = list(set(combinations))
+
     return combinations
 
 
-def generate_queries(query: str, items: list):
+def generate_queries(query: str, items: list, generate_combinations: bool = False):
     """
     Description:
-    -----------
+    ------------
     Generate a list of queries by combining the input query with each item in the provided list. The input query is combined with each item using "AND" to form a new query.
-    
+
     Parameters:
     -----------
     query (str): The base query to which items are appended.
 
     items (list): List of items to be combined with the query.
 
+    generate_combinations (bool): Indicated whether to generate all potential combinations of two tags within the items list. 
+
     Return:
-    ------
+    -------
     query_list (list of str): List of queries generated by combining the input query with each item.
     """
     query_list = []
-    combinations = generate_query_combinations(items)
+    if generate_combinations:
+        combinations = generate_query_combinations(items)
+    else:
+        combinations = items
     for item in combinations:
-        if query != "":
+        if query:
             updated_query = query + ' AND ' + item
         else:
             updated_query = item
@@ -684,19 +749,44 @@ def generate_queries(query: str, items: list):
     return query_list
 
 
-def find_optimal_query(query_list, target_file: str, source_file: str, target_title_column: str, source_title_column: str, source_abstract_column: str, max_matches: int) -> tuple[str, int]:
+def select_relevant_tags(source_file: str, tag_column: str, record_amount: int) -> list:
     """
     Description:
-    -----------
-    Find the optimal query by iteratively testing different queries and selecting the shortest one with the highest score and the lowest number of mismatches below a specified threshold.
-    
+    ------------
+    Select relevant tags from a specified column in a CSV file.
+
     Parameters:
-    ----------
+    -----------
+    source_file (str): Path to the CSV file containing the tags.
+
+    tag_column (str): Column name in the CSV file containing tags.
+
+    record_amount (int): Number of records to extract.
+
+    Return:
+    -------
+    tags_list (list of str): List of relevant tags.
+    """
+    df = pd.read_csv(source_file)
+    tags = df.head(record_amount)[tag_column]
+    tags_list = ', '.join(list(tags))
+    tags_list = tags_list.split(', ')
+    return tags_list
+
+
+def find_optimal_query_in_batches(query_list: list, target: pd.DataFrame, source: pd.DataFrame, target_title_column: str, source_title_column: str, source_abstract_column: str, max_matches: int, original_query: str) -> tuple[str, float, int]:
+    """
+    Description:
+    ------------
+    Find the optimal query by iteratively testing different queries and selecting the shortest one with the highest score and the lowest number of mismatches below a specified threshold.
+
+    Parameters:
+    -----------
     query_list (list of str): List of queries to be tested.
 
-    target_file (str): Path to the target file for testing the queries.
+    target (pd.Dataframe): Data that should be matched by the queries.
 
-    source_file (str): Path to the source file for testing the queries.
+    source (pd.Dataframe): Data to be searched that should not be matched by the queries.
 
     target_title_column (str): Column name in the target file containing titles.
 
@@ -707,7 +797,7 @@ def find_optimal_query(query_list, target_file: str, source_file: str, target_ti
     max_matches (int): Maximum number of matches allowed.
 
     Return:
-    ------
+    -------
     best_query (str): The optimal query with the highest score and the lowest number of matches.
 
     highest_score (float): The highest score among the tested queries.
@@ -720,63 +810,34 @@ def find_optimal_query(query_list, target_file: str, source_file: str, target_ti
 
     for query in query_list:
         score, matches, _ = test_query(
-            query, target_file, source_file, target_title_column, source_title_column, source_abstract_column)
+            query, target, source, target_title_column, source_title_column, source_abstract_column)
+        old_length = len(re.split(' AND | OR ', best_query))
+        new_length = len(re.split(' AND | OR ', query))
+        
+        if highest_score == float('-inf'):
+            highest_score, lowest_matches, best_query = score, matches, query
 
-        if matches < max_matches:
-            if score >= (highest_score - 2):
-                highest_score = score
-                lowest_matches = matches
-                best_query = query
+        elif (score/(matches + 0.01)) > (highest_score/(lowest_matches+0.01)) and score > round(highest_score-(len(target)/5)): 
+            highest_score, lowest_matches, best_query = score, matches, query
+        
+        elif (score, matches) == (highest_score, lowest_matches) and (old_length > new_length or score > highest_score):
+            highest_score, lowest_matches, best_query = score, matches, query
+
+    query = best_query.replace(f"{original_query} AND ", "")
+    print(f"{query}: {highest_score}/{lowest_matches}")
 
     return best_query, highest_score, lowest_matches
 
 
-def select_relevant_tags(source_file: str, tag_column: str, record_amount: int) -> list:
+def auto_optimize_query(query: str, extra_tags: str, target_title_column: str, source_title_column: str, source_abstract_column: str, max_matches: int, source_file: str = None, target_file: str = None, ingroup: pd.DataFrame = None, outgroup: pd.DataFrame = None, batch_size: int = 20):
     """
-    Description:
-    -----------
-    Select relevant tags from a specified column in a CSV file.
-
-    Parameters:
-    ----------
-    source_file (str): Path to the CSV file containing the tags.
-
-    tag_column (str): Column name in the CSV file containing tags.
-
-    record_amount (int): Number of records to extract.
-
-    Return:
-    ------
-    tags_list (list of str): List of relevant tags.
-    """
-    df = pd.read_csv(source_file)
-    tags = df.head(record_amount)[tag_column]
-    tags_list = ', '.join(list(tags))
-    tags_list = tags_list.split(', ')
-    return tags_list
-
-
-def auto_optimize_query(query: str, extra_tags: str, source_file: str, tag_file: str, tag_column: str, record_amount: int, target_file: str, target_title_column: str, source_title_column: str, source_abstract_column: str, max_matches: int):
-    """
-    Description:
-    -----------
     Automatically optimize the query by iteratively removing words and testing the resulting queries until a satisfactory query is found. It utilizes the find_optimal_query function for testing.
 
     Parameters:
-    ----------
+    -----------
     query (str): The initial query to be optimized.
 
     extra_tags (str): Additional tags to be considered in the optimization process.
-
-    source_file (str): Path to the source file for testing queries.
-
-    tag_file (str): Path to the tag file for selecting relevant tags.
-
-    tag_column (str): Column name in the tag file containing tags.
-
-    record_amount (int): Number of records to consider for tag selection.
-
-    target_file (str): Path to the target file for testing queries.
 
     target_title_column (str): Column name in the target file containing titles.
 
@@ -786,109 +847,120 @@ def auto_optimize_query(query: str, extra_tags: str, source_file: str, tag_file:
 
     max_matches (int): Maximum number of matches allowed.
 
+    source_file (str): Optional, path to the source file for testing queries.
+
+    target_file (str): Optional, path to the target file for testing queries.
+
+    ingroup (pd.DataFrmae): Optional, Data containing the items to be matched.
+
+    outgroup (pd.DataFrmae): Optional, Data containing the items to not be matched.
+
+    batch_size (int): Optional, defines the number of queries that should be evaluated simoutltaniously.
+
     Return:
-    ------
+    -------
     best_query (str): The optimized query.
 
     highest_score (float): The score of the optimized query.
 
     lowest_matches (int): The number of matches of the optimized query.
     """
-    relevant_tags = []
+    if ingroup is not None and outgroup is not None:
+        target = ingroup
+        source = pd.concat([outgroup, ingroup])
+    elif target_file is not None and source_file is not None: 
+        source = import_df(source_file)
+        target = import_df(target_file)
+    else:
+        raise ValueError(
+        "Please supply either input file and trainingset or ingroup and outgroup")
 
-    if record_amount != "":
-        relevant_tags = select_relevant_tags(
-            tag_file, tag_column, record_amount)
+    relevant_tags = extra_tags
+    non_relevant_tags = [tag for part in query.replace(
+        "(", "").replace(")", "").split(" AND ") for tag in part.split(" OR ")]
+    non_relevant_tags += ['and', 'or']
+    relevant_tags = [item.lstrip(' ') for item in relevant_tags if not any(
+        word in item for word in non_relevant_tags)]
+    relevant_tags_merged = [f"{query} AND {item}" for item in relevant_tags]
 
-    if extra_tags != "":
-        relevant_tags = relevant_tags + extra_tags
-    non_relevant_tags = ['forest', 'tropic',
-                         'climber', 'liana', 'vine', 'trend', 'change']
-
-    for word in non_relevant_tags:
-        relevant_tags = [item for item in relevant_tags if word not in item]
-    query_list = relevant_tags.copy()
-
-    best_query, highest_score, lowest_matches = find_optimal_query(
-        query_list=query_list,
-        target_file=target_file,
-        source_file=source_file,
-        target_title_column=target_title_column,
-        source_title_column=source_title_column,
-        source_abstract_column=source_abstract_column,
-        max_matches=max_matches
-    )
-
-    #print(f"The current query is: {best_query} with a score of {highest_score}/{lowest_matches}")
-
+    best_query, highest_score, lowest_matches = find_optimal_query_in_batches(
+                query_list=relevant_tags_merged,
+                target=target,
+                source=source,
+                target_title_column=target_title_column,
+                source_title_column=source_title_column,
+                source_abstract_column=source_abstract_column,
+                max_matches=max_matches,
+                original_query=query,
+                )
     while True:
-        higher_score = highest_score
-        lower_matches = lowest_matches
+        selected_word = best_query.replace(f"{query} AND ", "").replace(f"{query} OR ", "")
+        relevant_tags = [tag for tag in relevant_tags if tag not in selected_word]
+        relevant_tags_and = [f"{best_query} AND {item}" for item in relevant_tags]
+        relevant_tags_or = [f"{query} AND ({selected_word} OR {item})" for item in relevant_tags]
+        relevant_tags_merged = relevant_tags_and + relevant_tags_or
 
-        selected_word = best_query.replace(relevant_tags[0], "")
-        relevant_tags = [
-            item for item in relevant_tags if item != selected_word]
-
-        new_queries = []
-        for item in relevant_tags:
-            word_list = [best_query, item]
-            generated_queries = generate_queries("", word_list)
-            new_queries.extend(generated_queries)
-
-        query_list = list(set(new_queries))
-
-        better_query, higher_score, lower_matches = find_optimal_query(
-            query_list=query_list,
-            target_file=target_file,
-            source_file=source_file,
+        better_query, score, matches = find_optimal_query_in_batches(
+            query_list=relevant_tags_merged,
+            target=target,
+            source=source,
             target_title_column=target_title_column,
             source_title_column=source_title_column,
             source_abstract_column=source_abstract_column,
-            max_matches=lowest_matches
+            max_matches=max_matches,
+            original_query=query,
         )
+        old_length = len(re.split(' AND | OR ', best_query))
+        new_length = len(re.split(' AND | OR ', better_query))
 
-        better_query = better_query.replace(') OR', ' OR').replace(
-            'OR (', 'OR ').replace('))', ')').replace('((', '(').replace('  ', ' ')
-        #print(f"The current query is: {better_query} with a score of {higher_score}/{lower_matches}")
-
-        if higher_score < highest_score or lower_matches > lowest_matches+(0.05*max_matches):
+        if (score / (matches + 0.01)) > (highest_score / (lowest_matches + 0.01)) and score > round(highest_score - (len(target)/5)):
+            highest_score, lowest_matches, best_query = score, matches, better_query
+            best_query = best_query.replace("((", "(").replace("OR (", "OR ")
+        elif (score, matches) == (highest_score, lowest_matches) and (old_length > new_length or score > highest_score):
+            highest_score, lowest_matches, best_query = score, matches, better_query
+        else:
             break
-
-        best_query = better_query
-        highest_score = higher_score
-        lowest_matches = lower_matches
-
     return best_query, highest_score, lowest_matches
 
 
-def propose_tags(original_query: str, input_file: str, keyword_column: str, trainingset: tuple[int, int], n_tags: int, threshold: float):
+def propose_tags(original_query: str, keyword_column: str, n_tags: int, threshold: float, ingroup: pd.DataFrame = None, outgroup: pd.DataFrame = None, input_file: str = None ):
     """
     Description:
-    -----------
+    ------------
     Propose a list of tags based on an original query, input file, and specified parameters. It combines pseudo-relevance feedback and similarity feedback to expand the query and suggests tags.
 
     Parameters:
-    ----------
+    -----------
     original_query (str): The original query to be expanded.
 
-    input_file (str): Path to the input file for feedback.
-
     keyword_column (str): Column name in the input file containing keywords.
-
-    trainingset (tuple of int): Tuple representing the percentage of documents to consider as the training set and the remaining as the testing set.
 
     n_tags (int): Number of tags to propose.
 
     threshold (float): Threshold for similarity feedback.
 
+    ingroup (pd.DataFrame): Optional, Data containing the items that should be represented.
+
+    outgroup (pd.DataFrame): Optional, Data containing the items that should not be represented. 
+
+    input_file (str): Path to the input file for feedback.
+    
     Return:
-    ------
+    -------
     merged_terms (list of str): List of proposed tags after merging similar terms.
     """
     expanded_query1, top_articles = pseudo_relevance_feedback(
-        input=input_file, original_query=original_query, trainingset=trainingset, n_tags=n_tags)
-    expanded_query2 = similarity_feedback(
-        input=input_file, original_query=original_query, keyword_column=keyword_column, threshold=threshold)
+        original_query=original_query, n_tags=n_tags, ingroup=ingroup, outgroup=outgroup)
+    if ingroup is not None:
+        expanded_query2 = similarity_feedback(
+            ingroup=ingroup, original_query=original_query, keyword_column=keyword_column, threshold=threshold)
+    elif input_file is not None:
+        expanded_query2 = similarity_feedback(
+            input_path=input_file, original_query=original_query, keyword_column=keyword_column, threshold=threshold)
+    else:
+        raise ValueError( 
+            "Please supply either input file or ingroup")
+
     expanded_query = expanded_query1 + expanded_query2
     expanded_query = ', '.join(expanded_query)
     expanded_terms = merge_words_by_stem_and_wildcards(expanded_query)
@@ -898,21 +970,56 @@ def propose_tags(original_query: str, input_file: str, keyword_column: str, trai
     return merged_terms
 
 
-def propose_query(original_query: str, input_file: str, keyword_column: str, trainingset: int, n_tags: int, threshold: float, tag_column: str, target_file: str, target_title_column: str, source_title_column: str, source_abstract_column: str, max_matches: int):
+def calculate_best_query_by_subset(original_query: str, input_file:str, tag_column: str, n_tags: int, threshold: float, target_title_column: str, source_title_column: str, source_abstract_column: str, max_matches: int, ingroup:pd.DataFrame = None, outgroup:pd.DataFrame = None):
     """
     Description:
-    -----------
-    Propose an optimized query based on an original query, input file, and specified parameters. It iteratively refines the query by adjusting the training set percentage and utilizing the auto_optimize_query function.
-    
+    ------------
+    Determine the best query for the given training percentage. The ingroup is defined as the top (training percent)% records, the outgroup as the remaining records.
+
     Parameters:
-    ----------
+    -----------
+    trainingset (tuple of int): Tuple representing the percentage of documents to consider as the training set and the remaining as the testing set.
+
+    original_query (str): The original query to be optimized.
+
+    tag_column (str): Column name in the input file containing keywords.
+
+    n_tags (int): Number of tags to propose.
+
+    threshold (float): Threshold for similarity feedback.
+
+    ingroup (pd.DataFrame): Data containing the items to be matched.
+
+    outgroup (pd.DataFrame): Data containing the items to not be matched
+
+    Return:
+    -------
+    best_query (str): The optimized query for the current training set percentage.
+
+    highest_score (float): The score of the optimized query.
+
+    lowest_matches (int): The number of matches of the optimized query.
+    """
+    merged_terms = propose_tags(
+            original_query=original_query, input_file=input_file, keyword_column=tag_column, n_tags=n_tags, threshold=threshold, ingroup=ingroup, outgroup=outgroup)
+    best_query, highest_score, lowest_matches = auto_optimize_query(query=original_query, extra_tags=merged_terms, target_title_column=target_title_column, source_title_column=source_title_column, 
+                                                                        source_abstract_column=source_abstract_column, max_matches=max_matches, ingroup=ingroup, outgroup=outgroup)
+    return best_query, highest_score, lowest_matches
+
+
+def iteratively_propose_query(original_query: str, input_file: str, trainingset: int, n_tags: int, threshold: float, tag_column: str, target_file: str, target_title_column: str, source_title_column: str, source_abstract_column: str, max_matches: int, method:str = "none", subsample_size:int = 10):
+    """
+    Description:
+    ------------
+    Propose an optimized query based on an original query, input file, and specified parameters. It iteratively refines the query by adjusting the training set percentage and utilizing the auto_optimize_query function.
+
+    Parameters:
+    -----------
     original_query (str): The original query to be optimized.
 
     input_file (str): Path to the input file for feedback.
 
-    keyword_column (str): Column name in the input file containing keywords.
-
-    trainingset (int): Initial percentage of documents to consider as the training set.
+    trainingset (int): Used as initial percentage of documents to consider as the training set, after which it iterates decreasing by 5% each time.
 
     n_tags (int): Number of tags to propose.
 
@@ -930,73 +1037,195 @@ def propose_query(original_query: str, input_file: str, keyword_column: str, tra
 
     max_matches (int): Maximum number of matches allowed.
 
+    mode (str): Type of subsampling. Can be "random", for ten iterations of random subsamples of the trainingset with size subsample_size; "downsampling" for subsamples starting with the trainingset size and decrasing with subsample_size per iteration or "none" for one iteration at the trainingset size. 
+
+    subsample_size (int): Optional. Indicates size of random sample or stepsize for downsampling. Defaults to 10.
+
     Return:
-    ------
+    -------
     query_dict (dict): Dictionary containing the best query, highest score, and lowest matches for each iteration of the training set percentage.
     """
-    def calculate_best_query(trainingset):
-        """
-        Description:
-        -----------
-        Iteratively determine the best query by adjusting the training set percentage, proposing tags, and optimizing the query.
-        
-        Parameters:
-        ----------
-        trainingset (tuple of int): Tuple representing the percentage of documents to consider as the training set and the remaining as the testing set.
-        
-        original_query (str): The original query to be optimized.
-        
-        input_file (str): Path to the input file for feedback.
-        
-        keyword_column (str): Column name in the input file containing keywords.
-        
-        n_tags (int): Number of tags to propose.
-        
-        threshold (float): Threshold for similarity feedback.
-
-        Return:
-        ------
-        best_query (str): The optimized query for the current training set percentage.
-        
-        highest_score (float): The score of the optimized query.
-        
-        lowest_matches (int): The number of matches of the optimized query.
-        """
-        record_amount = round(max_matches*(trainingset[0]/100))
-        merged_terms = propose_tags(
-            original_query, input_file, keyword_column, trainingset, n_tags, threshold)
-        best_query, highest_score, lowest_matches = auto_optimize_query(query=original_query, extra_tags=merged_terms, tag_file=input_file, source_file=input_file, tag_column=tag_column, record_amount=record_amount,
-                                                                        target_file=target_file, target_title_column=target_title_column, source_title_column=source_title_column, source_abstract_column=source_abstract_column, max_matches=max_matches)
-        return best_query, highest_score, lowest_matches
-
     query_dict = {}
-    ingroup = trainingset
-    outgroup = 100-ingroup
-    while True:
-        if ingroup < 5:
-            break
-        trainingset = [ingroup, outgroup]
-        best_query, highest_score, lowest_matches = calculate_best_query(
-            trainingset)
-        ingroup = ingroup - 5
-        outgroup = 100-ingroup
-        current = best_query, highest_score, lowest_matches
-        query_dict.setdefault(ingroup, []).append(current)
-    print(f"The current best query is: {best_query} with a score of {highest_score}/{lowest_matches}")
+    ingroup_size = trainingset/100
+    df = pd.read_csv(input_file)
+    df_len = len(df)
+    in_len = round(df_len*ingroup_size)
+    out_len = df_len-in_len
+    ingroup = df.head(in_len)
+    outgroup = df.tail(out_len)
+
+    if method == "none":
+        out_len = df_len-in_len
+        ingroup = df.head(in_len)
+        outgroup = df.tail(out_len)
+        best_query, highest_score, lowest_matches = calculate_best_query_by_subset(
+            original_query=original_query, input_file=input_file, ingroup=ingroup, outgroup=outgroup, tag_column=tag_column, n_tags=n_tags, threshold=threshold, target_title_column=target_title_column, source_title_column=source_title_column, source_abstract_column = source_abstract_column, max_matches=max_matches)
+        query_dict[in_len] = {"query": best_query,
+                            "score": highest_score, "matches": lowest_matches}
+        print(f"The current best query for {in_len} {method} items is: {best_query} with a score of {highest_score}/{lowest_matches}")
+    elif method == "random":
+        for i in range(10):
+            sample = ingroup.sample(subsample_size)
+            merged_df = pd.merge(df, sample, how='outer', indicator=True)
+            outgroup = merged_df[merged_df['_merge'] == 'left_only'].drop(columns=['_merge'])
+            best_query, highest_score, lowest_matches = calculate_best_query_by_subset(
+                original_query=original_query, input_file=input_file, ingroup=sample, outgroup=outgroup, tag_column=tag_column, n_tags=n_tags, threshold=threshold, target_title_column=target_title_column, source_title_column=source_title_column, source_abstract_column = source_abstract_column, max_matches=subsample_size)
+            query_dict[f"{in_len}_{i}"] = {"query": best_query,
+                                "score": highest_score, "matches": lowest_matches}
+            print(f"The current best query for {in_len} {method} items is: {best_query} with a score of {highest_score}/{lowest_matches}")
+    elif method == "downsampling":
+        while True:
+            if in_len < subsample_size:
+                break
+            out_len = df_len-in_len
+            ingroup = df.head(in_len)
+            outgroup = df.tail(out_len)
+            best_query, highest_score, lowest_matches = calculate_best_query_by_subset(
+                original_query=original_query, input_file=input_file, ingroup=ingroup, outgroup=outgroup, tag_column=tag_column, n_tags=n_tags, threshold=threshold, target_title_column=target_title_column, source_title_column=source_title_column, source_abstract_column = source_abstract_column, max_matches=max_matches)
+            in_len = in_len - subsample_size
+            query_dict[in_len] = {"query": best_query,
+                                "score": highest_score, "matches": lowest_matches}
+            print(f"The current best query for {in_len} {method} items is: {best_query} with a score of {highest_score}/{lowest_matches}")
+
+        max_entry = max(query_dict.values(), key=lambda x: (x["score"], -x["matches"]))
+        key = list(query_dict.keys())[list(query_dict.values()).index(max_entry)]
+        print(
+            f"The best query was found for a trainingset of {key}% with: {max_entry['query']} with a score of {max_entry['score']}/{max_entry['matches']}")
+    else:
+        raise ValueError(
+            f"Please supply a valid method: random, downsampling or none")
     return query_dict
 
+
+def calculate_best_query_by_cluster(cluster_column: str, original_query: str, input_file: str, tag_column: str, n_tags: int, threshold: float, target_title_column: str, source_title_column: str, source_abstract_column: str, minimum_tag_length: int = 3):
+    """
+    Description:
+    ------------
+    Determine the best query for each cluster in the given column. The ingroup is defined as the top (training percent)% records, the outgroup as the remaining records.
+
+    Parameters:
+    -----------
+    trainingset (tuple of int): Tuple representing the percentage of documents to consider as the training set and the remaining as the testing set.
+
+    original_query (str): The original query to be optimized.
+
+    input_file (str): Path to the input file for feedback.
+
+    tag_column (str): Column name in the input file containing keywords.
+
+    n_tags (int): Number of tags to propose.
+
+    threshold (float): Threshold for similarity feedback.
+
+    minimum_tag_length (int): Optional, minimum length for a tag to be considered. Defaults to 3.
+
+    Return:
+    -------
+    best_query (str): The optimized query for the current training set percentage.
+
+    highest_score (float): The score of the optimized query.
+
+    lowest_matches (int): The number of matches of the optimized query.
+    """
+    def find_tags(df, column):
+        tags_list = df[column]
+        tags_list = ', '.join(list(tags_list))
+        tags_list = tags_list.split(', ')
+        return tags_list
+    dataframe = pd.read_csv(input_file)
+    cluster_dict = {}
+    for cluster_value in dataframe[cluster_column].unique():
+        data_ingroup = dataframe[dataframe[cluster_column] == cluster_value]
+        max_matches = len(data_ingroup)
+        data_outgroup = dataframe[dataframe[cluster_column] != cluster_value]
+        record_amount = dataframe[dataframe[cluster_column]
+                                  == cluster_value].shape[0]
+
+        print(
+            f"Cluster {cluster_value}: {max_matches}/{len(dataframe)} records")
+
+        merged_terms = propose_tags(
+            original_query, tag_column, n_tags, threshold, ingroup=data_ingroup, outgroup=data_outgroup)
+        relevant_tags = find_tags(data_ingroup, tag_column)
+        merged_terms += relevant_tags
+        merged_terms = [term for term in merged_terms if len(
+            term) >= minimum_tag_length]
+        best_query, highest_score, lowest_matches = auto_optimize_query(query=original_query, extra_tags=merged_terms, target_title_column=target_title_column, source_title_column=source_title_column, 
+                                                                        source_abstract_column=source_abstract_column, max_matches=max_matches, ingroup=data_ingroup, outgroup=data_outgroup)
+        cluster_dict[cluster_value] = {
+            "query": best_query, "score": highest_score, "matches": lowest_matches}
+        print(
+            f"The current best query for {cluster_value} is: {best_query} with a score of {highest_score}/{lowest_matches}")
+    return cluster_dict
+
+
+def analyze_clusters(query: str, cluster_range: tuple, cluster_column: str, training_filepath: str, title_column_test_file: str, title_column_training_file: str, abstract_column: str, keyword_column: str, n_tags: int, threshold: float, test_filepath: str = None) -> dict:
+    """
+    match the amount of titles in the cluster and optimize the query for each cluster within range
+
+    Parameters:
+    -----------
+    query (str): The original query to be optimized.
+
+    cluster_range (tuple): Range of clusters to be inspected. Generally starts with 1.
+
+    training_filepath (str): Path to the input file for feedback.
+
+    title_column_test_file (str): Column name in the target file containing titles.
+
+    title_column_training_file (str): Column name in the input file containing titles.
+
+    abstract_column (str): Column name in the input file containing abstracts.
+
+    keyword_column (str): Column name in the input file containing tags.
+
+    n_tags (int): Number of tags to propose.
+
+    threshold (float): Threshold for similarity feedback.
+
+    cluster_column (str): if supplied iterates over unique values as ingroup
+
+    test_filepath (str): Optional, path to the target file for files that should be present in output.
+
+    return:
+    -------
+    query_dict (dict): Dictionary containing the best query, highest score, and lowest matches for each iteration of the training set percentage.
+    """
+    minimum, maximum = cluster_range
+    if test_filepath:
+        test_file = import_df(test_filepath)
+        for i in range(minimum, maximum):
+            training_data = pd.read_csv(training_filepath)
+            ingroup = training_data[training_data[cluster_column] == i]
+            count_title_matches(
+                test_file, ingroup, title_column_test_file, title_column_training_file)
+    
+    query_dict = calculate_best_query_by_cluster(cluster_column=cluster_column, original_query=query, input_file=training_filepath, tag_column=keyword_column, n_tags=n_tags,
+                                                 threshold=threshold, target_title_column=title_column_test_file, source_title_column=title_column_training_file, source_abstract_column=abstract_column)
+    return query_dict
+
+
+
 if __name__ == "__main__":
-    # find dominant tags
+    # match the amount of titles in the cluster and optimize the query for each cluster within range
+    
+    #query_dict = analyze_clusters(query="forest* AND tropic* AND (climber* OR liana* OR vine*) AND (trend* OR change*)", cluster_column="Cluster", cluster_range=(1, 9), training_filepath="C:/NLPvenv/NLP/output/csv/savedrecs_lianas_sorted_all_clusters.csv",
+    #                              test_filepath="D:/Users/Sam/Downloads/lianas_oct24.csv", title_column_training_file="Article Title", title_column_test_file="Article Title", abstract_column="Abstract", keyword_column="Keywords", n_tags=30, threshold=0.2)
+    df = pd.read_csv("C:/NLPvenv/NLP/output/csv/savedrecs_lianas_sorted_all_clusters.csv")
+    df1 = pd.read_csv("D:/Users/Sam/Downloads/lianas_oct24.csv")
+    titles = emulate_query(query="forest* AND tropic* AND (climber* OR liana* OR vine*) AND (trend* OR change*) AND ground AND plots", df=df, title_column="Article Title", abstract_column="Abstract")
+    selection = df1[df1["Article Title"].isin(titles)]
+    print(selection)
+# find dominant tags
     # components = retrieve_pca_components(input_file="C:/NLPvenv/NLP/output/csv/savedrecs_lianas.csv", output="C:/NLPvenv/NLP/output/csv/savedrecs_lianas_sorted_deduplicated.csv", variables="Keywords", id="Article Title", tag_length=4, n_components_for_variance=80, number_of_records=35, show_plots="loading and scree and saturation")
-    # optimize query
-    # query_dict = propose_query(original_query="forest* AND tropic* AND (climber* OR liana* OR vine*) AND (trend* OR change*)", input_file="C:/NLPvenv/NLP/output/csv/lianas_sorted_deduplicated_cluster0.csv", keyword_column='Keywords', trainingset=10, n_tags=30, threshold=0.2,
-    #           tag_column="Keywords", target_file='D:/Users/Sam/Downloads/lianas_oct24.csv', target_title_column='title', source_title_column='Article Title', source_abstract_column='Abstract', max_matches=30)
-    # check new selection
-    for i in range(1, 10):
-        name = f"C:/NLPvenv/NLP/output/csv/savedrecs_lianas_sorted_cluster_{i}.csv"
-        count_title_matches('D:/Users/Sam/Downloads/lianas_oct24.csv', name, 'title', 'Article Title')
-        query_dict = propose_query(original_query="forest* AND tropic* AND (climber* OR liana* OR vine*) AND (trend* OR change*)", input_file=f"C:/NLPvenv/NLP/output/csv/savedrecs_lianas_sorted_cluster_{i}.csv", keyword_column='Keywords', trainingset=50, n_tags=30, threshold=0.2, tag_column="Keywords", target_file='D:/Users/Sam/Downloads/lianas_oct24.csv', target_title_column='title', source_title_column='Article Title', source_abstract_column='Abstract', max_matches=30)
-# subsample
+
+# optimize query
+    #query_dict = iteratively_propose_query(original_query="forest* AND tropic* AND (climber* OR liana* OR vine*) AND (trend* OR change*)", input_file="C:/NLPvenv/NLP/output/csv/savedrecs_lianas_sorted.csv", trainingset=14, n_tags=30, threshold=0.2,
+    #        tag_column="Keywords", target_file='D:/Users/Sam/Downloads/lianas_oct24.csv', target_title_column='Article Title', source_title_column='Article Title', source_abstract_column='Abstract', max_matches=37, method="none", subsample_size=2)
+    #for i in query_dict:
+    #    print(f"{i};{query_dict[i]['query']};{query_dict[i]['score']};{query_dict[i]['matches']}")
+
+    # subsample
     # titles = subsample_from_csv(CSV_path="D:/Users/Sam/Downloads/savedrecs(7).csv",
     #                            y="Keywords", x="Article Title", n=40, distance_type="similarity")
     # count_title_matches_from_list(file1_path='D:/Users/Sam/Downloads/lianas_oct24.csv', file1_column='title', selected_list=titles,show_score=True)

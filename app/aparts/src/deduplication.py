@@ -1,16 +1,20 @@
+import os
+from itertools import combinations, cycle
+from math import sqrt, ceil
+
+import matplotlib
+import matplotlib.cm as cm
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from sklearn.cluster import AgglomerativeClustering, KMeans
+from sklearn.decomposition import PCA
+from sklearn.metrics import pairwise_distances
+from sklearn.preprocessing import StandardScaler
+
 from aparts.src.subsampling import (assign_group, generate_binary_item_matrix,
                                     transform_dataframe)
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import pairwise_distances
-from sklearn.decomposition import PCA
-from sklearn.cluster import AgglomerativeClustering, KMeans
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from itertools import combinations
-import os
-import matplotlib
+
 matplotlib.use('TkAgg')
 
 
@@ -21,11 +25,11 @@ def group_tags_by_dissimilarity(dissimilarity_matrix: np.ndarray, tag_names: lis
     Parameters:
     -----------
     dissimilarity_matrix (np.ndarray): Matrix containing dissimilarity values between tags.
-    
+
     tag_names (list): List of tag names corresponding to the dissimilarity matrix.
-    
+
     threshold (float, optional): Distance threshold for clustering. Default is 0.5.
-    
+
     print_output (bool, optional): Flag to print additional output. Default is False.
 
     Return:
@@ -178,7 +182,7 @@ def merge_similar_tags_from_dataframe(input_file: str, output: str, variables: s
     tag_length (int): Length of tag n-grams for similarity comparison.
 
     number_of_records (int): Select only the top n records.
-    
+
     threshold (float, optional): Similarity threshold for grouping tags. Default is 0.6.
 
     manual (bool): include manual check of potential duplicates by y/n prompt per pair to either merge or discard ('q' to escape). Default is False.
@@ -490,19 +494,19 @@ def retrieve_pca_components(input_file: str, output: str, variables: str, id: st
     Parameters:
     -----------
     input_file (str): Path to the input file.
-    
+
     output (str): Path to the output file.
-    
+
     variables (str): Variable names in the input file.
-    
+
     id (str): Identifier column name.
-    
+
     tag_length (int): Length of tags to consider for merging.
-    
+
     number_of_records (int): Number of records to consider.
-    
+
     n_components_for_variance (int): Number of components to retain for variance analysis.
-    
+
     show_plots (str): String containing user-selected plots separated by "and".
 
     Return:
@@ -517,35 +521,37 @@ def retrieve_pca_components(input_file: str, output: str, variables: str, id: st
     return components
 
 
-def retrieve_clusters(input_file: str, output: str, variables: str, id: str, tag_length: int, number_of_records: int, n_components_for_variance: int, show_plots: str, transpose: bool = False, label: bool = False, max_clusters: int = 20, visualize_clusters:bool = False) -> pd.DataFrame:
+def retrieve_clusters(input_file: str, output: str, variables: str, id: str, tag_length: int, number_of_records: int, n_components_for_variance: int, show_plots: str, transpose: bool = False, label: bool = False, max_clusters: int = 20, visualize_clusters: bool = False, save_clusters: str = "separate") -> pd.DataFrame:
     """
     Retrieve clusters of source documents by tag similarity via performing PCA and k-means clustering.
 
     Parameters:
     -----------
     input_file (str): Path to the input file.
-    
+
     output (str): Path to the output file.
-    
+
     variables (str): Variable names in the input file.
-    
+
     id (str): Identifier column name.
-    
+
     tag_length (int): Length of tags to consider for merging.
-    
+
     number_of_records (int): Number of records to consider.
-    
+
     n_components_for_variance (int): Number of components to retain for variance analysis.
-    
+
     show_plots (str): String containing user-selected plots separated by "and".
-    
+
     transpose (bool, optional): Flag to transpose the DataFrame. Default is False.
-    
+
     label (bool, optional): Flag to label the clusters. Default is False.
-    
+
     max_clusters (int, optional): Maximum number of clusters for k-means. Default is 20.
-    
+
     visualize_clusters (bool, optional): Flag to visualize clusters in 3D. Default is False.
+
+    save_clusters (str): Determines how to save the clusters: separate/merged/all. Any other value does not generate csv output, but only returns the dataframe.
 
     Return:
     -----------
@@ -571,6 +577,8 @@ def retrieve_clusters(input_file: str, output: str, variables: str, id: str, tag
         plt.show()
 
         number_of_clusters = int(input("Select the number of clusters: "))
+        kmeans_pca = KMeans(n_clusters=number_of_clusters, init='k-means++', random_state=42)
+        kmeans_pca.fit(scores_pca)
         return number_of_clusters, kmeans_pca
 
     def visualize_clusters_3d(Dataframe_filtered_kmeans):
@@ -581,13 +589,21 @@ def retrieve_clusters(input_file: str, output: str, variables: str, id: str, tag
         -----------
         Dataframe_filtered_kmeans (pd.DataFrame): DataFrame containing PCA components and cluster labels.
         """
-        xs = Dataframe_filtered_kmeans['component 1']
-        ys = Dataframe_filtered_kmeans['component 2']
-        zs = Dataframe_filtered_kmeans['component 3']
+        unique_clusters = Dataframe_filtered_kmeans['Cluster'].unique()
+        colors = cm.viridis(np.linspace(0, 1, len(unique_clusters)))
 
-        ax = plt.figure().add_subplot(projection='3d')
-        ax.scatter(xs, ys, zs, c=Dataframe_filtered_kmeans['Segment K-means PCA'])
+        grid_dimension = ceil(sqrt(len(unique_clusters)))
+        fig, axs = plt.subplots(grid_dimension, grid_dimension, figsize=(15, 15), subplot_kw={'projection': '3d'})
+        axs = axs.flatten()
 
+        for ax, cluster_label, color in zip(axs, unique_clusters, cycle(colors)):
+            cluster_data = Dataframe_filtered_kmeans[Dataframe_filtered_kmeans['Cluster'] == cluster_label]
+            ax.scatter(cluster_data['component 1'], cluster_data['component 2'], cluster_data['component 3'], 
+                    c=[color], label=f'Cluster {cluster_label}')
+            ax.set_title(f'Cluster {cluster_label}')
+
+        for i in range(len(unique_clusters), len(axs)):
+            axs[i].axis('off')
         plt.show()
 
     def save_cluster_data(Dataframe_filtered_kmeans, input_file, file_name, number_of_clusters) -> None:
@@ -597,25 +613,56 @@ def retrieve_clusters(input_file: str, output: str, variables: str, id: str, tag
         Parameters:
         -----------
         Dataframe_filtered_kmeans (pd.DataFrame): DataFrame containing PCA components and cluster labels.
-        
+
         input_file (str): Path to the input file.
-        
+
         file_name (str): Base name for the output CSV files.
-        
+
         number_of_clusters (int): Number of clusters.
         """
         for i in range(number_of_clusters):
             cluster = i + 1
             cluster_data_PCA = Dataframe_filtered_kmeans[
-                Dataframe_filtered_kmeans['Segment K-means PCA'] == i].copy()
+                Dataframe_filtered_kmeans['Cluster'] == i].copy()
             cluster_data_PCA.rename(columns={list(cluster_data_PCA)[
                                     0]: 'Article Title'}, inplace=True)
             input_csv = pd.read_csv(input_file)
             cluster_original_data = retrieve_metadata_from_title(
                 cluster_data_PCA, "Article Title", input_csv, "Article Title")
-
             cluster_file_name = f"C:/NLPvenv/NLP/output/csv/{file_name}_cluster_{cluster}.csv"
             cluster_original_data.to_csv(cluster_file_name, index=False)
+    
+    def save_cluster_data_merged(Dataframe_filtered_kmeans, input_file, file_name, number_of_clusters) -> None:
+        """
+        Save cluster data to separate CSV files for each cluster.
+
+        Parameters:
+        -----------
+        Dataframe_filtered_kmeans (pd.DataFrame): DataFrame containing PCA components and cluster labels.
+
+        input_file (str): Path to the input file.
+
+        file_name (str): Base name for the output CSV files.
+
+        number_of_clusters (int): Number of clusters.
+        """
+        clusters_original_data = pd.DataFrame()
+        for i in range(number_of_clusters):
+            cluster = i + 1
+            cluster_data_PCA = Dataframe_filtered_kmeans[
+                Dataframe_filtered_kmeans['Cluster'] == i].copy()
+            cluster_data_PCA.rename(columns={list(cluster_data_PCA)[
+                                    0]: 'Article Title'}, inplace=True)
+            input_csv = pd.read_csv(input_file)
+            cluster_original_data = retrieve_metadata_from_title(
+                cluster_data_PCA, "Article Title", input_csv, "Article Title")
+            cluster_original_data["Cluster"] = cluster
+            clusters_original_data = pd.concat([clusters_original_data, pd.DataFrame(cluster_original_data)])
+            clusters_original_data = clusters_original_data.reset_index(drop=True)
+        
+        cluster_file_name = f"C:/NLPvenv/NLP/output/csv/{file_name}_all_clusters.csv"
+        clusters_original_data.to_csv(cluster_file_name, index=False)
+            
 
     Dataframe_merged = merge_similar_tags_from_dataframe(
         input_file, output, variables, id, tag_length, number_of_records)
@@ -631,14 +678,16 @@ def retrieve_clusters(input_file: str, output: str, variables: str, id: str, tag
     pca.fit(Dataframe_filtered)
     scores_pca = pca.transform(Dataframe_filtered)
 
-    number_of_clusters, kmeans_pca = perform_kmeans_clustering(
-        scores_pca, max_clusters)
+    number_of_clusters, kmeans_pca = perform_kmeans_clustering(scores_pca, max_clusters)
+
+
+    Dataframe_filtered['Cluster'] = kmeans_pca.labels_
 
     Dataframe_filtered_kmeans = pd.concat(
         [Dataframe_filtered.reset_index(), pd.DataFrame(scores_pca)], axis=1)
     Dataframe_filtered_kmeans.columns.values[-3:] = [
         'component 1', 'component 2', 'component 3']
-    Dataframe_filtered_kmeans['Segment K-means PCA'] = kmeans_pca.labels_
+    Dataframe_filtered_kmeans['Cluster'] = kmeans_pca.labels_
 
     if visualize_clusters:
         visualize_clusters_3d(Dataframe_filtered_kmeans)
@@ -646,8 +695,15 @@ def retrieve_clusters(input_file: str, output: str, variables: str, id: str, tag
     file_path = os.path.basename(input_file)
     file_name = os.path.splitext(file_path)[0]
 
-    save_cluster_data(Dataframe_filtered_kmeans, input_file,
-                      file_name, number_of_clusters)
+    if save_clusters == "merged" or save_clusters == "all":
+        save_cluster_data_merged(Dataframe_filtered_kmeans,
+                          input_file, file_name, number_of_clusters)
 
+    if save_clusters == "separate" or save_clusters == "all":
+        save_cluster_data(Dataframe_filtered_kmeans,
+                          input_file, file_name, number_of_clusters)
     return Dataframe_filtered_kmeans
 
+if __name__ == "__main__":
+    dataframe = retrieve_clusters(input_file="C:/NLPvenv/NLP/output/csv/savedrecs_lianas_sorted.csv", output="",
+                                  variables="Keywords", id="Article Title", tag_length=4,  number_of_records="", n_components_for_variance=0, show_plots="", transpose=False, max_clusters=20, save_clusters = "all", visualize_clusters=True)
