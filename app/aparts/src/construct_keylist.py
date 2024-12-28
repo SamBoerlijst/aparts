@@ -757,7 +757,7 @@ def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile
         for item in item_list:
             test = eval(item)
             for i in range(len(test)):
-                if not len(test[i]) > 3:
+                if not isinstance(test[i], str) or not len(test[i]) > 3:
                     eval(item)[i] = ""
         return
 
