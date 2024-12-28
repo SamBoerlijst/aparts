@@ -698,7 +698,7 @@ def extract_tags(records, column, name, Rake_stoppath, amount, input_folder) -> 
     return
 
 
-def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile: str = "", output_name: str = "", input_folder: str = "", author_given_keywords: str = "", original_keywords_txt: str = ""):
+def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile: str = "", output_name: str = "keyword_list", input_folder: str = "", author_given_keywords: str = "", original_keywords_txt: str = ""):
     """
     Creates a masterlist of keywords from all seven algorithms, any keywords present in the wos file and any keywords present in the bib file, by filtering for unique keywords and filtering by stem.
 
@@ -732,17 +732,18 @@ def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile
                 globals()[item] = []
 
     def clean_list(item_list: list) -> list:
-        """Clean up a list by removing unwanted characters and formatting."""
-        keyword_list = item_list
-        null_chars = ['"', "'", "[", "]", "<",
-                      ">", "{", "}", "*", "&", ":", "\\"]
-        space_chars = ["\_", "/", "_"]
 
-        keyword_list = str(sorted(list(set(keyword_list))))
-        keyword_list = [
-            " " if char in space_chars else char for char in item_list if char not in null_chars]
-        keyword_list = "".join(keyword_list).replace(",", ";").split("; ")
-        return keyword_list
+        """Clean up a list by removing unwanted characters and formatting."""
+        null_chars = ['"', "'", "[", "]", "<", ">", "{", "}", "*", "&", ":", "\\"]
+        space_chars = [",", "/", ""]
+        cleaned_list = []
+
+        for item in item_list:
+            cleaned_item = "".join(
+                " " if char in space_chars else char for char in item if char not in null_chars
+            )
+            cleaned_list.append(cleaned_item)
+        return cleaned_list
 
     def asciify(source_list: list) -> None:
         """Convert items in the source list to ASCII characters."""
@@ -757,8 +758,9 @@ def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile
         for item in item_list:
             test = eval(item)
             for i in range(len(test)):
-                if not isinstance(test[i], str) or not len(test[i]) > 3:
-                    eval(item)[i] = ""
+                if isinstance(test[i], str) and len(test[i]) < 3:
+                        eval(item)[i] = ""
+                        print("removed", test[i])
         return
 
     def filter_lists_by_stem(method_list: list) -> None:
@@ -770,11 +772,11 @@ def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile
             cor = 'cor_' + item
             stemcor = 'stemcor_' + item
 
-            eval(stem).extend(ps.stem(word) for word in test)
-            eval(stemcor).extend(eval(stem)[i] for i in range(
-                len(test)) if eval(stem)[i] not in eval(stemcor))
+            eval(stem).extend(ps.stem(word) for word in test if isinstance(word, str))
+            eval(stemcor).extend(test[i] for i in range(
+                len(eval(stem))) if eval(stem)[i] not in eval(stemcor))
             eval(cor).extend(eval(item)[i] for i in range(
-                len(test)) if eval(stem)[i] not in eval(stemcor))
+                len(eval(stem))) if eval(stem)[i] not in eval(stemcor))
         return
 
     def filterblacklist(source_list: list, fuzz_ratio: int = 80) -> None:
@@ -808,7 +810,8 @@ def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile
         output_list = []
         for i in range(len(score_list)):
             if score_list[i] >= minimum and score_list[i] <= maximum:
-                tag_matrix.append({tag_list[i], score_list[i]})
+                j = len(tag_matrix)
+                tag_matrix[j] = {tag_list[i]: score_list[i]}
                 output_list.append(tag_list[i])
         return output_list, tag_matrix
 
@@ -849,8 +852,7 @@ def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile
     print("constructing keyword list from combined output")
     read_files(filelist, methodlist)
     generate_empty_lists(methodlist, prefixes)
-    blacklist1 = re.compile("|".join([re.escape(word) for word in blacklist]))
-
+    
     if bibfile:
         bib_original = pd.read_csv(libtex_csv)["keywords"].tolist()
 
@@ -858,7 +860,7 @@ def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile
         wos_original = open(
             f"{input_folder}/{original_keywords_txt}.txt", "rb").readlines()
 
-    filter_by_length(methodlist)
+    #filter_by_length(methodlist)
     filter_lists_by_stem(methodlist)
     taglist, scorelist = merge_lists(methodlist)
     newlist, x = filter_items_by_overlap(taglist, scorelist, 2, 4)
@@ -867,11 +869,7 @@ def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile
     newlist = newlist + woslist + biblist
     newlist = clean_list(newlist)
     finallist = filterblacklist(newlist)
-
-    finallist = str(sorted(list(set(finallist)))).replace("'", "").split(",")
-
-    finallist = [word for word in finallist if not blacklist1.search(
-        word) and len(word) > 2]
+    finallist = [word for word in finallist if len(word) > 2]
     finallist = pd.DataFrame(finallist, columns=["ID"])
     finallist = (
         finallist.sort_values(by="ID", axis=0, ascending=True)
@@ -883,7 +881,7 @@ def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile
 
 
 # complete keylist routine
-def generate_keylist(input_folder="", records="", titlecolumn="Article Title", abstactcolumn="Abstract", bibfile="", libtex_csv="", output_name="", original_keywords_txt="", blacklist=blacklist, amount=50, author_given_keywords="", Rake_stoppath=""):
+def generate_keylist(input_folder="", records="", titlecolumn="Article Title", abstactcolumn="Abstract", bibfile="", libtex_csv="", output_name="keyword_list", original_keywords_txt="", blacklist=blacklist, amount=50, author_given_keywords="", Rake_stoppath=""):
     """
     Gerenates a keyword list using the Web of Science records by 1) extracting indexed keywords 2) filtering article titles for keywords using all seven algorithms,  3) filtering article abstracts for keywords using all seven algorithms, 4) extracting keywords present in a bib file and 5) filtering for unique values excluding keywords present in the blacklist.
     All parameters but the WOS file path and bibfile path have default values.
@@ -927,5 +925,5 @@ def generate_keylist(input_folder="", records="", titlecolumn="Article Title", a
 
 
 if __name__ == "__main__":
-    generate_keylist(input_folder= "C:/NLPvenv/nlp/input", records="savedrecs_lianas", bibfile="", libtex_csv="savedrecs_lianas_out", output_name="keylist", original_keywords_txt="wos_original_tags",
+    generate_keylist(input_folder= "C:/NLPvenv/nlp/input", records="savedrecs_lianas", bibfile="", libtex_csv="savedrecs_lianas_out", output_name="keyword_list", original_keywords_txt="wos_original_tags",
                      author_given_keywords="Author Keywords", Rake_stoppath="C:/NLPvenv/RAKE/data/stoplists/SmartStoplist.txt")
