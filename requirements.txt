@@ -16,7 +16,7 @@ python-dotenv>=1.0.0
 python_Levenshtein>=0.21.0
 pyvis>=0.3.2
 Requests>=2.31.0
-scholarly>=1.7.11
+scholarly==1.7.6
 scidownl>=1.0.2
 scikit_learn>=1.2.2
 scipy>=1.10.1
