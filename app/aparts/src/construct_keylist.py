@@ -698,7 +698,7 @@ def extract_tags(records, column, name, Rake_stoppath, amount, input_folder) -> 
     return
 
 
-def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile: str = "", output_name: str = "keyword_list", input_folder: str = "", author_given_keywords: str = "", original_keywords_txt: str = ""):
+def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile: str = "", output_name: str = "keyword_list", input_folder: str = "", author_given_keywords: str = "", original_keywords_txt: str = "", minimum: int = 2, maximum: int = 4):
     """
     Creates a masterlist of keywords from all seven algorithms, any keywords present in the wos file and any keywords present in the bib file, by filtering for unique keywords and filtering by stem.
 
@@ -707,6 +707,10 @@ def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile
     blacklist (list): list of strings to exclude.
 
     libtex_csv (str): Path to the csv file containing bib formatted citation metadata.
+
+    minimum (int): minimum overlap between algorithms to consider a keyword. Limits artifacts from being included.
+
+    maximum (int): maximum overlap between algorithms to consider a keyword. Limits common English words from being included.
 
     Return:
     -----------
@@ -863,7 +867,7 @@ def construct_keylist(blacklist: list = blacklist, libtex_csv: str = "", bibfile
     #filter_by_length(methodlist)
     filter_lists_by_stem(methodlist)
     taglist, scorelist = merge_lists(methodlist)
-    newlist, x = filter_items_by_overlap(taglist, scorelist, 2, 4)
+    newlist, x = filter_items_by_overlap(taglist, scorelist, minimum, maximum)
     woslist = asciify(wos_original)
     biblist = asciify(bib_original)
     newlist = newlist + woslist + biblist
