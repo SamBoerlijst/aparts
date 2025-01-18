@@ -717,11 +717,10 @@ def reset_eof_of_pdf_return_stream(pdf_stream_in: list) -> list:
     for i, x in enumerate(pdf_stream_in[::-1]):
         if b"%%EOF" in x:
             actual_line = len(pdf_stream_in) - i
-            pdf_stream_in[:actual_line]
-            # print(f'EOF found at line position {-i} = actual {actual_line}, with value {x}')
-            break
+            # print(f'EOF found at line {actual_line}, with value {x}')
+            return pdf_stream_in[:actual_line]
     # return the list up to that point
-    return 
+    return pdf_stream_in
 
 def convert_unicode_from_string(string:str)->str:
     """Convert an unicode string to utf-8."""
