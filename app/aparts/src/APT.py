@@ -702,7 +702,7 @@ def list_filenames(folder:str, type:str) -> list:
     return itemlist
 
 ## content manipulation
-def reset_eof_of_pdf_return_stream(pdf_stream_in: list) -> list:
+def reset_eof_of_pdf_return_stream(pdf_stream_in: list, verbose: bool = FALSE) -> list:
     """
     Fix EOF errors in files by finding EOF position.
 
@@ -716,9 +716,9 @@ def reset_eof_of_pdf_return_stream(pdf_stream_in: list) -> list:
     """
     for i, x in enumerate(pdf_stream_in[::-1]):
         if b"%%EOF" in x:
-            actual_line = len(pdf_stream_in) - i
-            # print(f'EOF found at line {actual_line}, with value {x}')
-            return pdf_stream_in[:actual_line]
+            actual_position = len(pdf_stream_in) - i
+            # print(f'EOF found at position {actual_position}, with value {x}')
+            return pdf_stream_in[:actual_position]
     # return the list up to that point
     return pdf_stream_in
 
@@ -739,7 +739,7 @@ def remove_trailing_backslashes(string:str)->str:
     )
     return string
 
-def pdf2txtfolder(PDFfolder: str, TXTfolder: str) -> None:
+def pdf2txtfolder(PDFfolder: str, TXTfolder: str, verbose: bool = FALSE) -> None:
     """
     Convert all PDF files in a given folder to txt files.
 
@@ -748,6 +748,8 @@ def pdf2txtfolder(PDFfolder: str, TXTfolder: str) -> None:
     PDFfolder (str): Path to the folder where the original files are located.
     
     TXTfolder (str): Path to the folder in which the extracted text should be stored.
+
+    Verbose (bool): Indicates whether end of file positions should be printed for debugging purposes.
 
     Returns:
     --------
@@ -763,7 +765,7 @@ def pdf2txtfolder(PDFfolder: str, TXTfolder: str) -> None:
             if os.path.isfile(f"{TXTfolder}/{file_}.txt") == False:
                 with open(f"{PDFfolder}/{file_}.pdf", "rb") as p:
                     contents = p.readlines()
-                    contents_eof_corrected = reset_eof_of_pdf_return_stream(contents)
+                    contents_eof_corrected = reset_eof_of_pdf_return_stream(contents, verbose)
                 with open(f"{PDFfolder}/{file_}.pdf", "wb") as d:
                     d.writelines(contents_eof_corrected)
 
@@ -1602,7 +1604,7 @@ def automated_pdf_tagging(source_folder:str="", PDFfolder:str="input/pdf", TXTfo
     guarantee_folder_exists("output/csv")
     guarantee_folder_exists("output/md")
     if weighted == True:
-        tag_folder_weighted(input_path = TXTCorfolder, keylist_path = keylist_path, alternate_lists = alternate_lists, treshold = 2)
+        tag_folder_weighted(input_path = TXTCorfolder, keylist_path = keylist_path, alternate_lists = alternate_lists, treshold = treshold)
     else:
         tag_folder(TXTCorfolder, keylist_path, outputCSV, alternate_lists)
     write_bib(outputCSV, libtex_csv, bibfile, bibfolder, CSVtotal)
