@@ -702,7 +702,7 @@ def list_filenames(folder:str, type:str) -> list:
     return itemlist
 
 ## content manipulation
-def reset_eof_of_pdf_return_stream(pdf_stream_in: list, verbose: bool = FALSE) -> list:
+def reset_eof_of_pdf_return_stream(pdf_stream_in: list) -> list:
     """
     Fix EOF errors in files by finding EOF position.
 
@@ -716,9 +716,9 @@ def reset_eof_of_pdf_return_stream(pdf_stream_in: list, verbose: bool = FALSE) -
     """
     for i, x in enumerate(pdf_stream_in[::-1]):
         if b"%%EOF" in x:
-            actual_position = len(pdf_stream_in) - i
-            # print(f'EOF found at position {actual_position}, with value {x}')
-            return pdf_stream_in[:actual_position]
+            actual_line = len(pdf_stream_in) - i
+            print(f'EOF found at line position {-i} = actual {actual_line}, with value {x}')
+            return pdf_stream_in[:actual_line]
     # return the list up to that point
     return pdf_stream_in
 
@@ -739,7 +739,7 @@ def remove_trailing_backslashes(string:str)->str:
     )
     return string
 
-def pdf2txtfolder(PDFfolder: str, TXTfolder: str, verbose: bool = FALSE) -> None:
+def pdf2txtfolder(PDFfolder: str, TXTfolder: str) -> None:
     """
     Convert all PDF files in a given folder to txt files.
 
@@ -748,8 +748,6 @@ def pdf2txtfolder(PDFfolder: str, TXTfolder: str, verbose: bool = FALSE) -> None
     PDFfolder (str): Path to the folder where the original files are located.
     
     TXTfolder (str): Path to the folder in which the extracted text should be stored.
-
-    Verbose (bool): Indicates whether end of file positions should be printed for debugging purposes.
 
     Returns:
     --------
@@ -765,7 +763,7 @@ def pdf2txtfolder(PDFfolder: str, TXTfolder: str, verbose: bool = FALSE) -> None
             if os.path.isfile(f"{TXTfolder}/{file_}.txt") == False:
                 with open(f"{PDFfolder}/{file_}.pdf", "rb") as p:
                     contents = p.readlines()
-                    contents_eof_corrected = reset_eof_of_pdf_return_stream(contents, verbose)
+                    contents_eof_corrected = reset_eof_of_pdf_return_stream(contents)
                 with open(f"{PDFfolder}/{file_}.pdf", "wb") as d:
                     d.writelines(contents_eof_corrected)
 
@@ -901,7 +899,7 @@ def remove_special_characters(text: str) -> str:
     cleaned_text = re.sub(illegal_chars, '', text)
     return cleaned_text
 
-def author_to_firstname_lastname(row: pd.Series) -> list:
+def author_to_firstname_lastname(row: pd.Series, author_column:str = "author") -> list:
     """
     Changes all author names within a pandas row from "lastname, firstname" to "firstname lastname"
 
@@ -914,7 +912,7 @@ def author_to_firstname_lastname(row: pd.Series) -> list:
     authorlist (list): List of all authornames as "firstname lastname".
     """
     authorlist = []
-    author = row["author"]
+    author = row[author_column]
     if pd.isna(author):
         authorlist = ["nan"]
     else:
@@ -941,22 +939,24 @@ def author_to_firstname_lastname(row: pd.Series) -> list:
             authorlist = [authors]
     return authorlist
 
-def correct_authornames(filepath: str)->None:
+def correct_authornames(filepath: str, separator: str = ",", title_column: str = "title", author_column: str = "author")->None:
     """
     Scans a dataset of articles for authornames, changes them from lastname, firstname to firstname lastname format, and saves the names to an "author_corrected" column.
 
     Parameters:
     -----------
     filepath (str): Filepath to dataset containing authornames to be changed.
+
+    separator (str): Delimiter of the input file.
     """
     path = str(filepath)
-    dataframe = pd.read_csv(path)
+    dataframe = pd.read_csv(path, sep = separator)
     data = {}
     for index, row in dataframe.iterrows():
-        if not pd.isna(row["title"]):
+        if not pd.isna(row[title_column]):
             name = []
             authorlist_corrected = []
-            authorlist = author_to_firstname_lastname(row)
+            authorlist = author_to_firstname_lastname(row, author_column)
             for ele in authorlist:
                 if str(ele) != "empty":
                     name = (
@@ -972,7 +972,7 @@ def correct_authornames(filepath: str)->None:
     # repopulate author_corrected column with name surname
     for index, pd_row in data.items():
         dataframe.at[index, "author_corrected"] = pd_row["author_corrected"][0]
-    dataframe.to_csv(filepath, index=False)
+    dataframe.to_csv(filepath, index=False, sep=separator)
     return
 
 def collapse_authors(names:list)->list:
@@ -1124,7 +1124,7 @@ def calculate_tag_counts(taglists, separator:str = ", ") -> pd.DataFrame:
 
 
 ## scan the txt files for strings contained in the keylist
-def tag_folder(TXTCorfolder: str = "input/pdf/docs/corrected", keylist_path: str = "input/keylist.csv", outputCSV: str = "output/csv/keywords.csv", alternate_lists: str = "none", print_to_console: bool = False)-> None:
+def tag_folder(TXTCorfolder: str = "input/pdf/docs/corrected", keylist_path: str = "input/keylist.csv", outputCSV: str = "output/csv/keywords.csv", alternate_lists: str = "none", print_to_console: bool = False, separator: str = ",")-> None:
     """
     Scans all txt files in a given folder for keywords from the supplied csv file and any alternate lists specified. The output is stored as csv with the filename as index.
     
@@ -1169,7 +1169,7 @@ def tag_folder(TXTCorfolder: str = "input/pdf/docs/corrected", keylist_path: str
                 dfcolumn = pd.DataFrame(
                     {"file": str(item), "keywords": str(unique_keywords)}, index=[0]
                 )
-                dfcolumn.to_csv(outputCSV, mode="a", index=False, header=False)
+                dfcolumn.to_csv(outputCSV, mode="a", index=False, header=False, sep=separator)
             print(f"tagged {item}")
     
     print("finished writing tags to keywords.csv")
@@ -1179,7 +1179,7 @@ def tag_folder(TXTCorfolder: str = "input/pdf/docs/corrected", keylist_path: str
         print(tagcounts)
     return 
 
-def tag_csv(inputCSV: str, outputCSV: str = "", outputfolder: str = "C:/NLPvenv/NLP/output/csv", titlecolumn: str = "Title", abstractcolumn: str = "Abstract", keylist_path: str = "input/keylist.csv", alternate_lists: str = "none", print_to_console: bool = False) -> None:
+def tag_csv(inputCSV: str, outputCSV: str = "", outputfolder: str = "C:/NLPvenv/NLP/output/csv", titlecolumn: str = "Title", abstractcolumn: str = "Abstract", keylist_path: str = "input/keylist.csv", alternate_lists: str = "none", print_to_console: bool = False, separator: str = ",") -> None:
     """
     Scans all items in a csv file for keywords and any alternate lists specified.
     
@@ -1227,7 +1227,7 @@ def tag_csv(inputCSV: str, outputCSV: str = "", outputfolder: str = "C:/NLPvenv/
             
             df.loc[df[titlecolumn] == title, 'Keywords'] = ', '.join(unique_keywords)
     
-    df.to_csv(outputCSV, index=False)
+    df.to_csv(outputCSV, index=False, sep = separator)
     print("finished writing tags to keywords.csv")
     tagcounts = calculate_tag_counts(taglists)
 
@@ -1252,7 +1252,7 @@ def tag_file_weighted(filename: str, keylist_path: str = "input/keylist.csv", al
         print_nested_dict(denested)
     return denested
 
-def tag_folder_weighted(input_path: str, outputCSV="output/csv/keywords.csv", keylist_path:str = "input/keylist.csv", alternate_lists: str = "all", treshold: int = 2,  print_to_console: bool = False) -> None:
+def tag_folder_weighted(input_path: str, outputCSV: str = "output/csv/keywords.csv", keylist_path: str = "input/keylist.csv", alternate_lists: str = "all", treshold: int = 2,  print_to_console: bool = False, separator: str = ",") -> None:
     """
     Scans each file within a folder for tags and weighs them based on the counts and locations of each occurrence within the document. Saves the data to a csv file in the provided folder and prints the data if output is set to True
 
@@ -1288,7 +1288,7 @@ def tag_folder_weighted(input_path: str, outputCSV="output/csv/keywords.csv", ke
             # create pandas row
             dfcolumn = pd.DataFrame(
             {"file": str(item), "keywords": str(text_keylist)}, index=[0])
-            dfcolumn.to_csv(outputCSV, mode="a", index=False, header=False)
+            dfcolumn.to_csv(outputCSV, mode="a", index=False, header=False, sep = separator)
             print("tagged", str(item))
     
     print("finished writing tags to keywords.csv")
@@ -1299,21 +1299,23 @@ def tag_folder_weighted(input_path: str, outputCSV="output/csv/keywords.csv", ke
     return 
 
 ## write the tags back into the .bib file
-def write_bib(output_csv_file="output/csv/keywords.csv", libtex_csv="input/savedrecs.csv", bibfile="", bibfolder ="output/bib", CSVtotal="output/csv/total.csv") -> None:
+def write_bib(output_csv_file: str = "output/csv/keywords.csv", libtex_csv: str = "input/savedrecs.csv", bibfile: str = "", bibfolder: str = "output/bib", CSVtotal: str = "output/csv/total.csv", separator: str = ",") -> None:
     """
     Imports the tags from csvtotal and combines them with the information given in the bibfile after which it stores the information as csv and bib.
     
     Parameters:
     -----------
-    - outputCSV (str): A filepath to a CSV file with the 'keywords' column containing tags to be merged with tags generated by the program.
+    outputCSV (str): A filepath to a CSV file with the 'keywords' column containing tags to be merged with tags generated by the program.
     
-    - libtex_csv (str): A filepath to a CSV file with bibliographic information to be updated with merged tags.
+    libtex_csv (str): A filepath to a CSV file with bibliographic information to be updated with merged tags.
     
-    - bibfile (str): A filepath to a .bib file with bibliographic entries to be updated with tags.
+    bibfile (str): A filepath to a .bib file with bibliographic entries to be updated with tags.
     
-    - bibfolder (str): A filepath to the directory where the updated .bib file should be saved.
+    bibfolder (str): A filepath to the directory where the updated .bib file should be saved.
     
-    - CSVtotal (str): A filepath to the directory where the merged CSV file should be saved.
+    CSVtotal (str): A filepath to the directory where the merged CSV file should be saved.
+
+    separator (str): The separator to use as csv delimiter. Defaults to ",".
 
     Returns:
     -----------
@@ -1330,7 +1332,7 @@ def write_bib(output_csv_file="output/csv/keywords.csv", libtex_csv="input/saved
     )
     
     # write all libtex data to csv
-    totalframe.drop(columns=["generated"]).to_csv(CSVtotal, index=False)
+    totalframe.drop(columns=["generated"]).to_csv(CSVtotal, index=False, sep=separator)
     
     bib_data = parse_file(bibfile)
     end = os.path.splitext(os.path.basename(bibfile))[0]
@@ -1344,7 +1346,7 @@ def write_bib(output_csv_file="output/csv/keywords.csv", libtex_csv="input/saved
 
 ## create summary per article
 # generate markdown files per article. The files are dynamically updates using js-code.
-def write_article_summaries(CSVtotal: str="output/csv/total.csv", Article_template: str="input/templates/Paper.md", mdFolder: str="output/md",) -> None:
+def write_article_summaries(CSVtotal: str="output/csv/total.csv", Article_template: str="input/templates/Paper.md", mdFolder: str="output/md", separator: str=",", author_column = "author", title_column = "title") -> None:
     """
     The write_article_summaries() function creates article summaries from a given CSV file of article information and a markdown template file. The summaries are saved as markdown files in a specified folder.
 
@@ -1356,6 +1358,12 @@ def write_article_summaries(CSVtotal: str="output/csv/total.csv", Article_templa
 
     mdFolder (str): The path to a folder where the markdown files will be saved.
 
+    separator (str): The delimiter of the input file. Defaults to ",".
+
+    Author_column (str): Column containing the author names in the input csv.
+
+    title_column (str): Column containing the article titles in the input csv.
+
     Return:
     -----------
     The function does not return any output, but saves the article summaries as markdown files in the specified folder.
@@ -1363,7 +1371,7 @@ def write_article_summaries(CSVtotal: str="output/csv/total.csv", Article_templa
     Note: The function uses several string manipulation functions to clean and format text data.
     """
     print("creating article summaries")
-    dataframe = pd.read_csv(CSVtotal)
+    dataframe = pd.read_csv(CSVtotal, sep=separator)
     with open(Article_template, "r") as f:
         template_text = f.read()
     placeholderlist = [
@@ -1383,9 +1391,9 @@ def write_article_summaries(CSVtotal: str="output/csv/total.csv", Article_templa
     ]
     valuelist = [
         "keywords",
-        "title",
+        title_column,
         "abstract",
-        "author",
+        author_column,
         "author_corrected",
         "date",
         "journaltitle",
@@ -1398,9 +1406,9 @@ def write_article_summaries(CSVtotal: str="output/csv/total.csv", Article_templa
     ]
     # create md file per article and repopulate other placeholders
     for index, row in dataframe.iterrows():
-        if str(row["title"]) != "nan":
+        if str(row[title_column]) != "nan":
             # Create file with title as name
-            title = str(row["title"])
+            title = str(row[title_column])
             illegal_chars = [":", ";", "=", ".", "{", "}", "?", ",", "\\", "/", "*", '"', "'", "textgreater", "textbackslash", "textlessI", "textlessspan"]
             for char in illegal_chars:
                 title = title.replace(char, "_")
@@ -1412,14 +1420,14 @@ def write_article_summaries(CSVtotal: str="output/csv/total.csv", Article_templa
             # populate placeholders
             data = populate_placeholders(placeholderlist, valuelist, row, data)
             populate_with_template(fullname, data)
-            print(f"generated atricle summary for {row['title']}")
+            print(f"generated atricle summary for {row[title_column]}")
         else:
-            print("skipped ", str(row["title"]))
+            print("skipped ", str(row[title_column]))
     return
 
 
 ## create javascript based dynamic summary per author
-def write_author_summaries(CSVtotal: str = "output/csv/total.csv", Author_template: str = "input/templates/Author.md", mdFolder: str = "output/md") -> None:
+def write_author_summaries(CSVtotal: str = "output/csv/total.csv", Author_template: str = "input/templates/Author.md", mdFolder: str = "output/md", separator: str = ",", author_column = "author", title_column = "title") -> None:
     """
     Creates author summaries per author per article from a given CSV file of article information and a markdown template file. The summaries are saved as markdown files in a specified folder.
 
@@ -1431,19 +1439,25 @@ def write_author_summaries(CSVtotal: str = "output/csv/total.csv", Author_templa
 
     mdFolder (str): The path to a folder where the markdown files will be saved.
 
+    separator (str): The delimiter of the input file. Defaults to ",".
+
+    Author_column (str): Column containing the author names in the input csv.
+
+    title_column (str): Column containing the article titles in the input csv.
+
     Returns:
     -----------
     None
     """
     print("Creating author summaries")
     
-    dataframe = pd.read_csv(CSVtotal)
+    dataframe = pd.read_csv(CSVtotal, sep=separator)
     template_text = open(Author_template, "r").read()
     
     authorlist = []
     
     for index, row in dataframe.iterrows():
-        if row["title"] != "nan" and str(row["author"]) != "nan":
+        if row[title_column] != "nan" and str(row[author_column]) != "nan":
             authorlist.extend(author_to_firstname_lastname(row))
     
     unique_authors = collapse_authors(authorlist)
@@ -1463,7 +1477,7 @@ def write_author_summaries(CSVtotal: str = "output/csv/total.csv", Author_templa
 
 
 ## create javascript based dynamic summary per journal
-def write_journal_summaries(CSVtotal: str = "output/csv/total.csv", Journal_template: str = "input/templates/Journal.md", mdFolder: str = "output/md") -> None:
+def write_journal_summaries(CSVtotal: str = "output/csv/total.csv", Journal_template: str = "input/templates/Journal.md", mdFolder: str = "output/md", separator: str = ",") -> None:
     """
     Reads a CSV file containing information about journals and creates summary files for each journal using a template.
     The summary files are saved in a specified directory. The function iterates over the rows in the CSV file and for each row,
@@ -1473,8 +1487,12 @@ def write_journal_summaries(CSVtotal: str = "output/csv/total.csv", Journal_temp
     Parameters:
     -----------
     CSVtotal (str): The path to the CSV file containing journal information.
+    
     Journal_template (str): The path to the template file to be used for creating journal summary files.
+    
     mdFolder (str): The path to the directory where the journal summary files will be saved.
+    
+    separator (str): The delimiter of the input file. Defaults to ",".
 
     Returns:
     -----------
@@ -1482,7 +1500,7 @@ def write_journal_summaries(CSVtotal: str = "output/csv/total.csv", Journal_temp
     """
     print("Creating journal summaries")
     
-    dataframe = pd.read_csv(CSVtotal)
+    dataframe = pd.read_csv(CSVtotal, sep=separator)
     template_text = open(Journal_template, "r").read()
 
     for index, row in dataframe.iterrows():
@@ -1524,7 +1542,7 @@ def prepare_input(source_folder="", PDFfolder="input/pdf", TXTfolder="input/pdf/
     return
 
 
-def create_summaries(mdFolder="output/md", Article_template="input/templates/Paper.md", Author_template="input/templates/Author.md", Journal_template="input/templates/Journal.md", CSVtotal="output/csv/total.csv") -> None:
+def create_summaries(mdFolder: str="output/md", Article_template: str="input/templates/Paper.md", Author_template: str="input/templates/Author.md", Journal_template: str="input/templates/Journal.md", CSVtotal: str="output/csv/total.csv", separator: str=",", author_column:str = "author", title_column: str = "title") -> None:
     """
     Creates a summary per article and js based dynamic summaries per author and journal.
     
@@ -1540,16 +1558,20 @@ def create_summaries(mdFolder="output/md", Article_template="input/templates/Pap
     
     CSVtotal (str): Path to the file in which to store the .csv output.
 
+    Author_column (str): Column containing the author names in the input csv.
+
+    title_column (str): Column containing the article titles in the input csv.
+
     Return:
     -----------
     None
 
     """
-    guarantee_md_output_folders_exist(mdFolder)
-    correct_authornames(CSVtotal)
-    write_article_summaries(CSVtotal, Article_template, mdFolder)
-    write_author_summaries(CSVtotal, Author_template, mdFolder)
-    write_journal_summaries(CSVtotal, Journal_template, mdFolder)
+    guarantee_md_output_folders_exist(folder = mdFolder)
+    correct_authornames(filepath = CSVtotal, separator = separator, author_column = author_column, title_column = title_column)
+    write_article_summaries(CSVtotal = CSVtotal, Article_template = Article_template, mdFolder = mdFolder, separator = separator, author_column = author_column, title_column = title_column)
+    write_author_summaries(CSVtotal = CSVtotal, Author_template = Author_template, mdFolder = mdFolder, separator = separator, author_column = author_column, title_column = title_column)
+    write_journal_summaries(CSVtotal = CSVtotal, Journal_template = Journal_template, mdFolder = mdFolder, separator = separator, author_column = author_column, title_column = title_column)
 
 
 ### complete tagging routine
@@ -1604,7 +1626,7 @@ def automated_pdf_tagging(source_folder:str="", PDFfolder:str="input/pdf", TXTfo
     guarantee_folder_exists("output/csv")
     guarantee_folder_exists("output/md")
     if weighted == True:
-        tag_folder_weighted(input_path = TXTCorfolder, keylist_path = keylist_path, alternate_lists = alternate_lists, treshold = treshold)
+        tag_folder_weighted(input_path = TXTCorfolder, keylist_path = keylist_path, alternate_lists = alternate_lists, treshold = 2)
     else:
         tag_folder(TXTCorfolder, keylist_path, outputCSV, alternate_lists)
     write_bib(outputCSV, libtex_csv, bibfile, bibfolder, CSVtotal)
