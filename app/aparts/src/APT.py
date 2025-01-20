@@ -1575,7 +1575,7 @@ def create_summaries(mdFolder: str="output/md", Article_template: str="input/tem
 
 
 ### complete tagging routine
-def automated_pdf_tagging(source_folder:str="", PDFfolder:str="input/pdf", TXTfolder:str="input/pdf/docs", TXTCorfolder:str="input/pdf/docs/corrected", keylist_path:str="input/keylist.csv", outputCSV:str="output/csv/keywords.csv", libtex_csv:str="input/savedrecs.csv", bibfile:str="", bibfolder:str="output/bib", CSVtotal:str="output/csv/total.csv", mdFolder:str="output/md", Article_template:str="input/templates/Paper.md", Author_template:str="input/templates/Author.md", Journal_template:str="input/templates/Journal.md", alternate_lists:str="none", weighted:bool= False, treshold:int = 2, summaries:bool = False) -> None:
+def automated_pdf_tagging(source_folder:str="", PDFfolder:str="input/pdf", TXTfolder:str="input/pdf/docs", TXTCorfolder:str="input/pdf/docs/corrected", keylist_path:str="input/keylist.csv", outputCSV:str="output/csv/keywords.csv", libtex_csv:str="input/savedrecs.csv", bibfile:str="", bibfolder:str="output/bib", CSVtotal:str="output/csv/total.csv", mdFolder:str="output/md", Article_template:str="input/templates/Paper.md", Author_template:str="input/templates/Author.md", Journal_template:str="input/templates/Journal.md", alternate_lists:str="none", weighted:bool= False, treshold:int = 2, summaries:bool = False, separator:str = ",") -> None:
     """
     Complete workflow for pdf tagging. Define 1) the reference manager path containing all pdf files and 2) the path to the .bib file, 3) the alternative taglist to include (defaults to "none").
 
@@ -1626,12 +1626,12 @@ def automated_pdf_tagging(source_folder:str="", PDFfolder:str="input/pdf", TXTfo
     guarantee_folder_exists("output/csv")
     guarantee_folder_exists("output/md")
     if weighted == True:
-        tag_folder_weighted(input_path = TXTCorfolder, keylist_path = keylist_path, alternate_lists = alternate_lists, treshold = 2)
+        tag_folder_weighted(input_path = TXTCorfolder, keylist_path = keylist_path, alternate_lists = alternate_lists, treshold = 2, separator = separator)
     else:
-        tag_folder(TXTCorfolder, keylist_path, outputCSV, alternate_lists)
-    write_bib(outputCSV, libtex_csv, bibfile, bibfolder, CSVtotal)
+        tag_folder(TXTCorfolder, keylist_path, outputCSV, alternate_lists, separator)
+    write_bib(outputCSV, libtex_csv, bibfile, bibfolder, CSVtotal, separator)
     if summaries == True:
-        create_summaries(mdFolder, Article_template, Author_template, Journal_template, CSVtotal)
+        create_summaries(mdFolder = mdFolder, Article_template = Article_template, Author_template = Author_template, Journal_template = Journal_template, CSVtotal = CSVtotal, separator = separator, author_column = author_column, title_column = title_column)
     return
 
 
