@@ -1298,7 +1298,6 @@ def tag_folder_weighted(input_path: str, outputCSV: str = "output/csv/keywords.c
         print(tagcounts)
     return 
 
-## write the tags back into the .bib file
 def write_bib(output_csv_file: str = "output/csv/keywords.csv", libtex_csv: str = "input/savedrecs.csv", bibfile: str = "", bibfolder: str = "output/bib", CSVtotal: str = "output/csv/total.csv", separator: str = ",") -> None:
     """
     Imports the tags from csvtotal and combines them with the information given in the bibfile after which it stores the information as csv and bib.
@@ -1320,29 +1319,55 @@ def write_bib(output_csv_file: str = "output/csv/keywords.csv", libtex_csv: str 
     Returns:
     -----------
     None
-    """
-    keyframe = pd.read_csv(output_csv_file).rename(columns={"keywords": "generated"})
+    """    
+    keyframe = pd.read_csv(output_csv_file)
     libframe = pd.read_csv(libtex_csv)
+
+    bib_data = parse_file(bibfile)
+    filename = os.path.splitext(os.path.basename(bibfile))[0]
+
+    join_dict = []
+
+    for entry in bib_data.entries.values():
+        entry = entry.fields
+        if "file" in entry:
+            if "title" in entry:
+                title_lookup = entry["title"]
+                filenpath_lookup = entry["file"].split("\\\\")[-1]
+                filename_item = filenpath_lookup.split(".pdf")[0]
+                lookup_raw = keyframe.loc[keyframe["file"] == filename_item]["keywords"]
+                keyword_lookup = " ".join(lookup_raw).replace("'", "").replace("[", "").replace("]", "").split(", ")
+                bib_keywords = str(entry.get("keywords", "")).split(", ") if entry.get("keywords", "") else []
+                combined_keywords = bib_keywords + keyword_lookup
+                entry["keywords"] = ", ".join(set(combined_keywords)).replace("'", "").replace("[", "").replace("]", "").replace("\\", "").replace("{", "").replace("}", "")
+                row = {'file': filename_item, 'title': title_lookup, 'keywords': entry["keywords"]}
+                join_dict.append(row)
+
+    bib_data.to_file(f"{bibfolder}/{filename}_tagged.bib")
     
-    # join dataframes and extract tags
-    totalframe = libframe.merge(keyframe, how="outer").fillna("")
+    join_df = pd.DataFrame(join_dict)
+    
+    totalframe = libframe.merge(join_df, how="outer", on="file").fillna("")
+
+    del totalframe["Article Title"]
+
     totalframe["keywords"] = totalframe.apply(
-        lambda row: ", ".join(set(str(row["keywords"]).lower().split(", ") + str(row["generated"]).lower().split(", "))).replace("'", "").replace("[", "").replace("]", ""),
+        lambda row: ", ".join(
+            set(
+                str(row["keywords_x"]).split(", ") if row["keywords_x"] else [] + 
+                str(row["keywords_y"]).split(", ")
+            )
+        ).replace("'", "").replace("[", "").replace("]", "").replace("\\", "").replace("{", "").replace("}", ""),
         axis=1
     )
+
+    del totalframe["keywords_x"]
+    del totalframe["keywords_y"]
+
+    totalframe.to_csv(CSVtotal, index=False, sep=separator)
     
-    # write all libtex data to csv
-    totalframe.drop(columns=["generated"]).to_csv(CSVtotal, index=False, sep=separator)
-    
-    bib_data = parse_file(bibfile)
-    end = os.path.splitext(os.path.basename(bibfile))[0]
-    # add tags to bibtex library
-    for entry in bib_data.entries.values():
-        entryname = str(entry.key)
-        keywordlookup = totalframe.loc[totalframe["entry"] == entryname, "keywords"].iloc[0]
-        entry.fields["keywords"] = keywordlookup
-    bib_data.to_file(f"{bibfolder}/{end}_tagged.bib")
     return
+
 
 ## create summary per article
 # generate markdown files per article. The files are dynamically updates using js-code.
