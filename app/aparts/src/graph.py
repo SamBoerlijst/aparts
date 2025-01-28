@@ -96,7 +96,7 @@ def remove_dead_links_from_reference_dict(check_dict: dict, check_key: str, comp
     return new_dict
 
 
-def file_name_to_title(filename: str, CSV: str) -> str:
+def file_name_to_title(filename: str, CSV: str, separator: str = ";") -> str:
     """
     Return the title for an item by lookup of their filename within the given Excel file.
 
@@ -110,7 +110,7 @@ def file_name_to_title(filename: str, CSV: str) -> str:
     -----------
     title (str): Corresponding reference title.
     """
-    source_frame = pd.read_csv(CSV)
+    source_frame = pd.read_csv(CSV, sep = separator)
     row = source_frame.loc[source_frame['file'] == filename]
     title = row['title']
     return title
@@ -154,7 +154,7 @@ def extract_year(date_string):
     else:
         return date_string
 
-def collect_data_from_csv(CSV: str) -> dict:
+def collect_data_from_csv(CSV: str, separator: str = ";") -> dict:
     """
     Return relevant article metadata from a csv file as dictionary.
 
@@ -167,7 +167,7 @@ def collect_data_from_csv(CSV: str) -> dict:
 
     dataframe (dict): Dictionary containing each item and their respective metadata as index[title:str, year:str, authorlist:list, journal:str, filename:str, keywords:list]
     """
-    source_frame = pd.read_csv(CSV)
+    source_frame = pd.read_csv(CSV, sep = separator)
     dataframe = {}
     for index, row in source_frame.iterrows():
         if str(row["title"]) != "nan":
@@ -192,13 +192,15 @@ def collect_data_from_csv(CSV: str) -> dict:
     return dataframe
 
 
-def parse_data_from_csv(CSV) -> tuple[dict, dict, dict, dict]:
+def parse_data_from_csv(CSV:str, title_column: str = "title", keyword_column: str = "keywords", year_column: str = "year", authorlist_column: str = "authors", journal_column: str = "journal") -> tuple[dict, dict, dict, dict]:
     """
     Extracts relationships between reference and respective tag(s), year, author(s) or journal and returns these per group as dictionary.
 
     Parameters:
     -----------
     CSV (str): Absolute path to the excel file containing references and their respective metadata.
+
+    *_column (str): Name of the column containing the * metadata
 
     Returns:
     -----------
@@ -208,7 +210,7 @@ def parse_data_from_csv(CSV) -> tuple[dict, dict, dict, dict]:
 
     reference_data_authors (dict): Dictionary containing the linked data for parent to authors as reference - author - color.
 
-    reference_data_journal (dict):Dictionary containing the linked data for parent to journal as reference - journal - color.
+    reference_data_journal (dict): Dictionary containing the linked data for parent to journal as reference - journal - color.
     """
     dataframe = collect_data_from_csv(CSV)
     reference_data_tags = {}
@@ -216,25 +218,25 @@ def parse_data_from_csv(CSV) -> tuple[dict, dict, dict, dict]:
     reference_data_authors = {}
     reference_data_journal = {}
     for key, value in dataframe.items():
-        source = value['title']
-        for item in value['keywords']:
+        source = value[title_column]
+        for item in value[keyword_column]:
             index = len(reference_data_tags.items())+1
             current = {index: {"source": source,
                                "destination": item, "color": 1}}
             reference_data_tags.update(current)
         index = len(reference_data_year.items())+1
-        if value['year'] != "":
+        if value[year_column] != "":
             current = {index: {"source": source,
                             "destination": value['year'], "color": 3}}
             reference_data_year.update(current)
-        for item in value['authorlist']:
+        for item in value[authorlist_column]:
             index = len(reference_data_authors.items())+1
             current = {index: {"source": source,
                                "destination": item, "color": 4}}
             reference_data_authors.update(current)
         index = len(reference_data_journal.items())+1
         current = {index: {"source": source,
-                           "destination": value['journal'], "color": 3}}
+                           "destination": value[journal_column], "color": 3}}
         reference_data_journal.update(current)
     return reference_data_tags, reference_data_year, reference_data_authors, reference_data_journal
 
@@ -389,7 +391,7 @@ def create_network_lists(reference_dict: dict[int, dict]) -> list:
     return source_list, destination_list, color_list
 
 
-def graph_view(totalCSV: str, path: str, height: str, width: str, depth: int, color_scheme: list, graph_name: str) -> None:
+def graph_view(totalCSV: str, path_to_references: str, height: str, width: str, depth: int, color_scheme: list, graph_name: str, folder_name: str = "/output", title_column: str = "title", tag_column: str = "tags", year_column: str = "year", author_column: str = "authors", journal_column: str = "journal") -> None:
     """
     Generate a 2D node-network visualization of articles, relevant metadata (authors, journals, tags) and optionally their citations and respective authors. Saves the graph as html.
 
@@ -397,7 +399,7 @@ def graph_view(totalCSV: str, path: str, height: str, width: str, depth: int, co
     -----------
     totalCSV (str): Excelfile containing article metadata to include.
 
-    path (str): Absolute path to the folder containing text files to scan for citations (see depth).
+    path_to_references (str): Absolute path to the folder containing text files to scan for citations (see depth).
 
     height (str): Indicates how high the graph should be rendered, either in px or %, e.g. '1080xp'. 
 
@@ -407,7 +409,7 @@ def graph_view(totalCSV: str, path: str, height: str, width: str, depth: int, co
 
     color_scheme (list): Hexcode list of colours to render the graph with. 
 
-    graph_name (str):
+    graph_name (str): filename to save the graph to.
 
     Returns:
     --------
@@ -448,12 +450,12 @@ def graph_view(totalCSV: str, path: str, height: str, width: str, depth: int, co
                          color=color_scheme[color], size=size_destination, borderWidthSelected=18, group=group_destination, title=destination)
             net.add_edge(source, destination, value=5, color=color_scheme[5])
 
-    if os.path.isfile(path):
+    if os.path.isfile(path_to_references):
         inter_reference_dict, year_dict, author_dict = link_from_file(
-            path, depth)
-    elif os.path.isdir(path):
+            path_to_references, depth)
+    elif os.path.isdir(path_to_references):
         inter_reference_dict, year_dict, author_dict = link_from_folder(
-            path, depth)
+            path_to_references, depth)
 
     net = Network(height=height, width=width,
                   bgcolor="#222222", font_color="white", directed=True, filter_menu=True)
@@ -484,26 +486,26 @@ def graph_view(totalCSV: str, path: str, height: str, width: str, depth: int, co
         sources, targets, color = create_network_lists(author_dict)
         intra_citation_data_authors = zip(sources, targets, color)
         populate_graph(intra_citation_data_authors, 4,
-                       2, "citation", "author", 3, 4)
+                       2, "citation", "Author", 3, 4)
 
     # reference
     reference_dict_tags, reference_dict_year, reference_dict_authors, reference_dict_journal = parse_data_from_csv(
-        totalCSV)
+        totalCSV, title_column=title_column, keyword_column=tag_column, year_column=year_column, authorlist_column=author_column, journal_column=journal_column)
 
     sources, targets, color = create_network_lists(reference_dict_tags)
     reference_data_tags = zip(sources, targets, color)
-    populate_graph(reference_data_tags, 8, 6, "source_document", "tags", 1, 2)
+    populate_graph(reference_data_tags, 8, 6, "source_document", tag_column, 1, 2)
     sources, targets, color = create_network_lists(reference_dict_year)
     reference_data_year = zip(sources, targets, color)
-    populate_graph(reference_data_year, 8, 6, "source_document", "year", 1, 2)
+    populate_graph(reference_data_year, 8, 6, "source_document", year_column, 1, 2)
     sources, targets, color = create_network_lists(reference_dict_authors)
     reference_data_authors = zip(sources, targets, color)
     populate_graph(reference_data_authors, 8, 6,
-                   "source_document", "author", 1, 2)
+                   "source_document", author_column, 1, 2)
     sources, targets, color = create_network_lists(reference_dict_journal)
     reference_data_journal = zip(sources, targets, color)
     populate_graph(reference_data_journal, 8, 6,
-                   "source_document", "journal", 1, 2)
+                   "source_document", journal_column, 1, 2)
 
     neighbor_map = net.get_adj_list()
     # add neighbor data to node hover data
@@ -512,7 +514,7 @@ def graph_view(totalCSV: str, path: str, height: str, width: str, depth: int, co
         node["title"] += " Neighbors:<br>" + "<br>".join(neighbor_map[node["id"]])
     net.set_edge_smooth("dynamic")
     #net.show_buttons('physics')
-    net.show(f"{graph_name}.html", notebook=False)
+    net.show(f"{folder_name}/{graph_name}.html", notebook=False)
     return
 
 

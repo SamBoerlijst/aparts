@@ -1061,7 +1061,7 @@ def preprocess_text(text:str)->str:
     text = fix_broken_words(text)
     return text
 
-def construct_keylist(keylist_path:str, alternate_lists:str)->list:
+def construct_keylist(keylist_path: str, alternate_lists: str, separator: str = ";")->list:
     """
     Merge list of keywords from csv with chosen optional keywords.
     
@@ -1075,7 +1075,7 @@ def construct_keylist(keylist_path:str, alternate_lists:str)->list:
     -----------
     keylist (list): List of the combination of unique keywords.
     """
-    keylist_csv = pd.read_csv(keylist_path)["ID"].tolist()
+    keylist_csv = pd.read_csv(keylist_path, sep = separator)["ID"].tolist()
     additional_keywords = set_additional_keywords(alternate_lists)
     keylist = (keylist_csv + additional_keywords)
     keylist = sort_joined_list(keylist)
@@ -1124,7 +1124,7 @@ def calculate_tag_counts(taglists, separator:str = ", ") -> pd.DataFrame:
 
 
 ## scan the txt files for strings contained in the keylist
-def tag_folder(TXTCorfolder: str = "input/pdf/docs/corrected", keylist_path: str = "input/keylist.csv", outputCSV: str = "output/csv/keywords.csv", alternate_lists: str = "none", print_to_console: bool = False, separator: str = ",")-> None:
+def tag_folder(TXTCorfolder: str = "input/pdf/docs/corrected", keylist_path: str = "input/keylist.csv", outputCSV: str = "output/csv/keywords.csv", alternate_lists: str = "none", print_to_console: bool = False, separator: str = ";")-> None:
     """
     Scans all txt files in a given folder for keywords from the supplied csv file and any alternate lists specified. The output is stored as csv with the filename as index.
     
@@ -1151,7 +1151,7 @@ def tag_folder(TXTCorfolder: str = "input/pdf/docs/corrected", keylist_path: str
     df = pd.DataFrame(columns=["file", "keywords"])
     guarantee_csv_exists(outputCSV, df)
 
-    outputfile = pd.read_csv(outputCSV)["file"].tolist()
+    outputfile = pd.read_csv(outputCSV, sep = separator)["file"].tolist()
     itemlist = list_filenames(TXTCorfolder, "*.txt")
     taglists = []
     
@@ -1179,7 +1179,7 @@ def tag_folder(TXTCorfolder: str = "input/pdf/docs/corrected", keylist_path: str
         print(tagcounts)
     return 
 
-def tag_csv(inputCSV: str, outputCSV: str = "", outputfolder: str = "C:/NLPvenv/NLP/output/csv", titlecolumn: str = "Title", abstractcolumn: str = "Abstract", keylist_path: str = "input/keylist.csv", alternate_lists: str = "none", print_to_console: bool = False, separator: str = ",") -> None:
+def tag_csv(inputCSV: str, outputCSV: str = "", outputfolder: str = "C:/NLPvenv/NLP/output/csv", titlecolumn: str = "Title", abstractcolumn: str = "Abstract", keylist_path: str = "input/keylist.csv", alternate_lists: str = "none", print_to_console: bool = False, separator: str = ";") -> None:
     """
     Scans all items in a csv file for keywords and any alternate lists specified.
     
@@ -1209,7 +1209,7 @@ def tag_csv(inputCSV: str, outputCSV: str = "", outputfolder: str = "C:/NLPvenv/
         print(f"Output file set to: {outputCSV}")
     keylist = construct_keylist(keylist_path, alternate_lists)
 
-    df = pd.read_csv(inputCSV)
+    df = pd.read_csv(inputCSV, sep = separator)
     df['Keywords'] = None
     guarantee_csv_exists(outputCSV, df)
     
@@ -1274,7 +1274,7 @@ def tag_folder_weighted(input_path: str, outputCSV: str = "output/csv/keywords.c
     df = pd.DataFrame(columns=["file", "keywords"])
     guarantee_csv_exists(outputCSV, df)
 
-    outputfile = pd.read_csv(outputCSV)["file"].tolist()
+    outputfile = pd.read_csv(outputCSV, sep = separator)["file"].tolist()
     itemlist = list_filenames(input_path, "*.txt")
     taglists = []
 
@@ -1320,8 +1320,8 @@ def write_bib(output_csv_file: str = "output/csv/keywords.csv", libtex_csv: str 
     -----------
     None
     """    
-    keyframe = pd.read_csv(output_csv_file)
-    libframe = pd.read_csv(libtex_csv)
+    keyframe = pd.read_csv(output_csv_file, sep = separator)
+    libframe = pd.read_csv(libtex_csv, sep = separator)
 
     bib_data = parse_file(bibfile)
     filename = os.path.splitext(os.path.basename(bibfile))[0]
@@ -1344,11 +1344,8 @@ def write_bib(output_csv_file: str = "output/csv/keywords.csv", libtex_csv: str 
                 join_dict.append(row)
 
     bib_data.to_file(f"{bibfolder}/{filename}_tagged.bib")
-    
     join_df = pd.DataFrame(join_dict)
-    
     totalframe = libframe.merge(join_df, how="outer", on="file").fillna("")
-
     del totalframe["Article Title"]
 
     totalframe["keywords"] = totalframe.apply(
@@ -1363,9 +1360,7 @@ def write_bib(output_csv_file: str = "output/csv/keywords.csv", libtex_csv: str 
 
     del totalframe["keywords_x"]
     del totalframe["keywords_y"]
-
     totalframe.to_csv(CSVtotal, index=False, sep=separator)
-    
     return
 
 
@@ -1600,7 +1595,7 @@ def create_summaries(mdFolder: str="output/md", Article_template: str="input/tem
 
 
 ### complete tagging routine
-def automated_pdf_tagging(source_folder:str="", PDFfolder:str="input/pdf", TXTfolder:str="input/pdf/docs", TXTCorfolder:str="input/pdf/docs/corrected", keylist_path:str="input/keylist.csv", outputCSV:str="output/csv/keywords.csv", libtex_csv:str="input/savedrecs.csv", bibfile:str="", bibfolder:str="output/bib", CSVtotal:str="output/csv/total.csv", mdFolder:str="output/md", Article_template:str="input/templates/Paper.md", Author_template:str="input/templates/Author.md", Journal_template:str="input/templates/Journal.md", alternate_lists:str="none", weighted:bool= False, treshold:int = 2, summaries:bool = False, separator:str = ",") -> None:
+def automated_pdf_tagging(source_folder:str="", PDFfolder:str="input/pdf", TXTfolder:str="input/pdf/docs", TXTCorfolder:str="input/pdf/docs/corrected", keylist_path:str="input/keylist.csv", outputCSV:str="output/csv/keywords.csv", libtex_csv:str="input/savedrecs.csv", bibfile:str="", bibfolder:str="output/bib", CSVtotal:str="output/csv/total.csv", mdFolder:str="output/md", Article_template:str="input/templates/Paper.md", Author_template:str="input/templates/Author.md", Journal_template:str="input/templates/Journal.md", alternate_lists:str="none", weighted:bool= False, treshold:int = 2, summaries:bool = False, separator:str = ",", author_column: str = "Authors", title_column: str = "Title") -> None:
     """
     Complete workflow for pdf tagging. Define 1) the reference manager path containing all pdf files and 2) the path to the .bib file, 3) the alternative taglist to include (defaults to "none").
 
@@ -1663,7 +1658,7 @@ def automated_pdf_tagging(source_folder:str="", PDFfolder:str="input/pdf", TXTfo
 if __name__ == "__main__":
     #automated_pdf_tagging(source_folder="C:/Users/sboer/Zotero/storage", bibfile="input/library.bib", alternate_lists="all", weighted = True, treshold = 5, summaries = True)
     #tag_csv(inputCSV="C:/NLPvenv/NLP/input/savedrecs_lianas.csv", titlecolumn="Article Title", keylist_path="C:/NLPvenv/NLP/input/keylist_lianas.csv", print_to_console=True)
-    df = pd.read_csv("C:/NLPvenv/NLP/output/csv/savedrecs_lianas.csv")['Keywords']
+    df = pd.read_csv("C:/NLPvenv/NLP/output/csv/savedrecs_lianas.csv", sep = ";")['Keywords']
     summary = calculate_tag_counts(df)
     pd.set_option('display.max_rows', None) 
     print(summary)

@@ -147,7 +147,7 @@ def summarize_file(filepath:str, sections:list, amount:int, offset:int)->str:
     summary = summarize_text(text, sectiondict, amount, offset)
     return summary
 
-def summarize_csv(outputCSV:str, txtfolder:str, sections:list, amount:int, offset:int)->None:
+def summarize_csv(outputCSV:str, txtfolder:str, sections:list, amount:int, offset:int, separator: str = ";")->None:
     """
     Generates a summary of the source text for all txt files in the given folder. The generated summary is derived from sentences from the listed sections.
     
@@ -170,7 +170,7 @@ def summarize_csv(outputCSV:str, txtfolder:str, sections:list, amount:int, offse
     header = pd.DataFrame(columns = ["file", "summary"])
     guarantee_csv_exists(outputCSV, header)
     file_list = list_filenames(txtfolder, "*.txt")
-    previously_summarized = pd.read_csv(outputCSV)["file"].tolist()
+    previously_summarized = pd.read_csv(outputCSV, sep = separator)["file"].tolist()
     for item in file_list:
         if str(item) not in previously_summarized:
             filepath = f"{txtfolder}/{item}.txt"

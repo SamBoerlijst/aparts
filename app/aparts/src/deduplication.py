@@ -606,7 +606,7 @@ def retrieve_clusters(input_file: str, output: str, variables: str, id: str, tag
             axs[i].axis('off')
         plt.show()
 
-    def save_cluster_data(Dataframe_filtered_kmeans, input_file, file_name, number_of_clusters) -> None:
+    def save_cluster_data(Dataframe_filtered_kmeans, input_file, file_name, number_of_clusters, separator: str = ";") -> None:
         """
         Save cluster data to separate CSV files for each cluster.
 
@@ -626,13 +626,13 @@ def retrieve_clusters(input_file: str, output: str, variables: str, id: str, tag
                 Dataframe_filtered_kmeans['Cluster'] == i].copy()
             cluster_data_PCA.rename(columns={list(cluster_data_PCA)[
                                     0]: 'Article Title'}, inplace=True)
-            input_csv = pd.read_csv(input_file)
+            input_csv = pd.read_csv(input_file, sep = separator)
             cluster_original_data = retrieve_metadata_from_title(
                 cluster_data_PCA, "Article Title", input_csv, "Article Title")
             cluster_file_name = f"C:/NLPvenv/NLP/output/csv/{file_name}_cluster_{cluster}.csv"
             cluster_original_data.to_csv(cluster_file_name, index=False)
     
-    def save_cluster_data_merged(Dataframe_filtered_kmeans, input_file, file_name, number_of_clusters) -> None:
+    def save_cluster_data_merged(Dataframe_filtered_kmeans, input_file, file_name, number_of_clusters, separator: str = ";") -> None:
         """
         Save cluster data to separate CSV files for each cluster.
 
@@ -653,7 +653,7 @@ def retrieve_clusters(input_file: str, output: str, variables: str, id: str, tag
                 Dataframe_filtered_kmeans['Cluster'] == i].copy()
             cluster_data_PCA.rename(columns={list(cluster_data_PCA)[
                                     0]: 'Article Title'}, inplace=True)
-            input_csv = pd.read_csv(input_file)
+            input_csv = pd.read_csv(input_file, sep = separator)
             cluster_original_data = retrieve_metadata_from_title(
                 cluster_data_PCA, "Article Title", input_csv, "Article Title")
             cluster_original_data["Cluster"] = cluster

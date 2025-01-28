@@ -17,11 +17,11 @@ from aparts.src.subsampling import (assign_group, generate_binary_item_matrix,
 from itertools import product
 
 
-def import_df(filepath:str)->pd.DataFrame:
+def import_df(filepath:str, separator: str = ";")->pd.DataFrame:
     """import csv or xlsx file based on filepath"""
     file_extension = filepath.split('.')[-1]
     if file_extension == 'csv':
-        df = pd.read_csv(filepath)
+        df = pd.read_csv(filepath, sep = separator)
     elif file_extension in ['xls', 'xlsx']:
         df = pd.read_excel(filepath)
     else:
@@ -330,7 +330,7 @@ def group_synonyms(words, fuzzy_threshold=""):
     return grouped_list
 
 
-def similarity_feedback(original_query: str = "Culex pipiens AND population dynamics", keyword_column: str = 'keywords', threshold: float = 0.2, top_k: int = 3, input_path: str = "", ingroup: pd.DataFrame = "") -> list[str]:
+def similarity_feedback(original_query: str = "Culex pipiens AND population dynamics", keyword_column: str = 'keywords', threshold: float = 0.2, top_k: int = 3, input_path: str = "", ingroup: pd.DataFrame = "", separator: str = ";") -> list[str]:
     """
     Expand a query based on tag co-occurrence in the source csv.
 
@@ -351,7 +351,7 @@ def similarity_feedback(original_query: str = "Culex pipiens AND population dyna
     expanded_query (str): The expanded query with similar tags added.
     """
     if input_path:
-        df = pd.read_csv(input_path)
+        df = pd.read_csv(input_path, sep = separator)
     else:
         df = ingroup
     df = df.dropna(subset=[keyword_column])
@@ -363,7 +363,7 @@ def similarity_feedback(original_query: str = "Culex pipiens AND population dyna
     return expanded_query
 
 
-def pseudo_relevance_feedback(original_query: str, n_tags: int = 10, n_articles: int = 20, print_weights: bool = False, input_file: str = None, ingroup: pd.DataFrame = None, outgroup: pd.DataFrame = None, batch_size: int = 20) -> list[str]:
+def pseudo_relevance_feedback(original_query: str, n_tags: int = 10, n_articles: int = 20, print_weights: bool = False, input_file: str = None, ingroup: pd.DataFrame = None, outgroup: pd.DataFrame = None, batch_size: int = 20, separator: str = ";", tag_column: str = "keywords") -> list[str]:
     """
     Perform pseudo-relevance feedback on a collection of documents using the Rocchio algorithm on TF-IDF weights.
 
@@ -387,7 +387,7 @@ def pseudo_relevance_feedback(original_query: str, n_tags: int = 10, n_articles:
     updated_query_str (str): The updated query string after pseudo-relevance feedback.
     """
     def load_data(input_file, trainingset):
-        sourcefile = pd.read_csv(input_file)
+        sourcefile = pd.read_csv(input_file, sep = separator)
         matches, non_matches = trainingset
         length = sourcefile.shape[0]
         ingroup_records = int((matches / 100) * length)
@@ -398,24 +398,24 @@ def pseudo_relevance_feedback(original_query: str, n_tags: int = 10, n_articles:
         return df, ingroup, outgroup
 
     def process_batch(tfidf_vectorizer, updated_query_array, batch_df):
-        batch_df = batch_df.dropna(subset=['Keywords'])
+        batch_df = batch_df.dropna(subset=[tag_column])
 
         if not batch_df.empty:
             tfidf_matrix_batch = tfidf_vectorizer.transform(
-                batch_df['Keywords'])
+                batch_df[tag_column])
             cosine_similarities_batch = cosine_similarity(
                 updated_query_array, tfidf_matrix_batch)
             batch_df.loc[:, 'cosine_similarity'] = cosine_similarities_batch[0].copy()
 
         return batch_df
 
-    def calculate_updated_query(tfidf_vectorizer: any, original_query: str, ingroup: pd.DataFrame, outgroup: pd.DataFrame):
+    def calculate_updated_query(tfidf_vectorizer: any, original_query: str, ingroup: pd.DataFrame, outgroup: pd.DataFrame, tag_column:str = "keywords"):
         alpha = 1.0
         beta = 0.75
         gamma = 0.25
 
         tfidf_matrix = tfidf_vectorizer.fit_transform(
-            pd.concat([ingroup, outgroup], ignore_index=True)['Keywords'])
+            pd.concat([ingroup, outgroup], ignore_index=True)[tag_column])
         expanded_query_vector = tfidf_vectorizer.transform([original_query])
         updated_query = alpha * expanded_query_vector + beta * \
             np.mean(tfidf_matrix[ingroup.index, :], axis=0) - \
@@ -469,7 +469,7 @@ def pseudo_relevance_feedback(original_query: str, n_tags: int = 10, n_articles:
     return top_relevant_tags, top_articles
 
 
-def count_title_matches(file1: pd.DataFrame, file2: pd.DataFrame, file1_column: str, file2_column: str, show_missing: bool = False):
+def count_title_matches(file1: pd.DataFrame, file2: pd.DataFrame, file1_column: str, file2_column: str, show_missing: bool = False, separator: str = ";"):
     """
     Count the number of matching titles between two files.
 
@@ -494,7 +494,7 @@ def count_title_matches(file1: pd.DataFrame, file2: pd.DataFrame, file1_column: 
     elif type(file1) == str:
         file1_extension = file1.split('.')[-1]
         if file1_extension == 'csv':
-            df1 = pd.read_csv(file1)
+            df1 = pd.read_csv(file1, sep = separator)
         elif file1_extension in ['xls', 'xlsx']:
             df1 = pd.read_excel(file1)
         else:
@@ -505,7 +505,7 @@ def count_title_matches(file1: pd.DataFrame, file2: pd.DataFrame, file1_column: 
     elif type(file2) == str:
         file2_extension = file2.split('.')[-1]
         if file2_extension == 'csv':
-            df2 = pd.read_csv(file2)
+            df2 = pd.read_csv(file2, sep = separator)
         elif file2_extension in ['xls', 'xlsx']:
             df2 = pd.read_excel(file2)
         else:
@@ -749,7 +749,7 @@ def generate_queries(query: str, items: list, generate_combinations: bool = Fals
     return query_list
 
 
-def select_relevant_tags(source_file: str, tag_column: str, record_amount: int) -> list:
+def select_relevant_tags(source_file: str, tag_column: str, record_amount: int, separator: str = ";") -> list:
     """
     Description:
     ------------
@@ -767,7 +767,7 @@ def select_relevant_tags(source_file: str, tag_column: str, record_amount: int) 
     -------
     tags_list (list of str): List of relevant tags.
     """
-    df = pd.read_csv(source_file)
+    df = pd.read_csv(source_file, sep = separator)
     tags = df.head(record_amount)[tag_column]
     tags_list = ', '.join(list(tags))
     tags_list = tags_list.split(', ')
@@ -1007,7 +1007,7 @@ def calculate_best_query_by_subset(original_query: str, input_file:str, tag_colu
     return best_query, highest_score, lowest_matches
 
 
-def iteratively_propose_query(original_query: str, input_file: str, trainingset: int, n_tags: int, threshold: float, tag_column: str, target_file: str, target_title_column: str, source_title_column: str, source_abstract_column: str, max_matches: int, method:str = "none", subsample_size:int = 10):
+def iteratively_propose_query(original_query: str, input_file: str, trainingset: int, n_tags: int, threshold: float, tag_column: str, target_file: str, target_title_column: str, source_title_column: str, source_abstract_column: str, max_matches: int, method:str = "none", subsample_size:int = 10, separator: str = ";"):
     """
     Description:
     ------------
@@ -1047,7 +1047,7 @@ def iteratively_propose_query(original_query: str, input_file: str, trainingset:
     """
     query_dict = {}
     ingroup_size = trainingset/100
-    df = pd.read_csv(input_file)
+    df = pd.read_csv(input_file, sep = separator)
     df_len = len(df)
     in_len = round(df_len*ingroup_size)
     out_len = df_len-in_len
@@ -1097,7 +1097,7 @@ def iteratively_propose_query(original_query: str, input_file: str, trainingset:
     return query_dict
 
 
-def calculate_best_query_by_cluster(cluster_column: str, original_query: str, input_file: str, tag_column: str, n_tags: int, threshold: float, target_title_column: str, source_title_column: str, source_abstract_column: str, minimum_tag_length: int = 3):
+def calculate_best_query_by_cluster(cluster_column: str, original_query: str, input_file: str, tag_column: str, n_tags: int, threshold: float, target_title_column: str, source_title_column: str, source_abstract_column: str, minimum_tag_length: int = 3, separator: str = ";"):
     """
     Description:
     ------------
@@ -1132,7 +1132,7 @@ def calculate_best_query_by_cluster(cluster_column: str, original_query: str, in
         tags_list = ', '.join(list(tags_list))
         tags_list = tags_list.split(', ')
         return tags_list
-    dataframe = pd.read_csv(input_file)
+    dataframe = pd.read_csv(input_file, sep = separator)
     cluster_dict = {}
     for cluster_value in dataframe[cluster_column].unique():
         data_ingroup = dataframe[dataframe[cluster_column] == cluster_value]
@@ -1159,7 +1159,7 @@ def calculate_best_query_by_cluster(cluster_column: str, original_query: str, in
     return cluster_dict
 
 
-def analyze_clusters(query: str, cluster_range: tuple, cluster_column: str, training_filepath: str, title_column_test_file: str, title_column_training_file: str, abstract_column: str, keyword_column: str, n_tags: int, threshold: float, test_filepath: str = None) -> dict:
+def analyze_clusters(query: str, cluster_range: tuple, cluster_column: str, training_filepath: str, title_column_test_file: str, title_column_training_file: str, abstract_column: str, keyword_column: str, n_tags: int, threshold: float, test_filepath: str = None, separator: str = ";") -> dict:
     """
     match the amount of titles in the cluster and optimize the query for each cluster within range
 
@@ -1195,7 +1195,7 @@ def analyze_clusters(query: str, cluster_range: tuple, cluster_column: str, trai
     if test_filepath:
         test_file = import_df(test_filepath)
         for i in range(minimum, maximum):
-            training_data = pd.read_csv(training_filepath)
+            training_data = pd.read_csv(training_filepath, sep = separator)
             ingroup = training_data[training_data[cluster_column] == i]
             count_title_matches(
                 test_file, ingroup, title_column_test_file, title_column_training_file)
@@ -1211,8 +1211,8 @@ if __name__ == "__main__":
     
     #query_dict = analyze_clusters(query="forest* AND tropic* AND (climber* OR liana* OR vine*) AND (trend* OR change*)", cluster_column="Cluster", cluster_range=(1, 9), training_filepath="C:/NLPvenv/NLP/output/csv/savedrecs_lianas_sorted_all_clusters.csv",
     #                              test_filepath="D:/Users/Sam/Downloads/lianas_oct24.csv", title_column_training_file="Article Title", title_column_test_file="Article Title", abstract_column="Abstract", keyword_column="Keywords", n_tags=30, threshold=0.2)
-    df = pd.read_csv("C:/NLPvenv/NLP/output/csv/savedrecs_lianas_sorted_all_clusters.csv")
-    df1 = pd.read_csv("D:/Users/Sam/Downloads/lianas_oct24.csv")
+    df = pd.read_csv("C:/NLPvenv/NLP/output/csv/savedrecs_lianas_sorted_all_clusters.csv", sep = ";")
+    df1 = pd.read_csv("D:/Users/Sam/Downloads/lianas_oct24.csv", sep = ";")
     titles = emulate_query(query="forest* AND tropic* AND (climber* OR liana* OR vine*) AND (trend* OR change*) AND ground AND plots", df=df, title_column="Article Title", abstract_column="Abstract")
     selection = df1[df1["Article Title"].isin(titles)]
     print(selection)

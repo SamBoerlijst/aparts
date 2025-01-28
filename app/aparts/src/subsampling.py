@@ -6,7 +6,7 @@ from scipy.spatial.distance import braycurtis
 from sklearn.cluster import KMeans
 
 
-def generate_binary_item_matrix(CSV_path: str = "", y: str = "keywords", x: str = "title", keyword_length: int = 3, number_of_records: int = "", delimiter: str = ", ") -> tuple[pd.DataFrame, list]:
+def generate_binary_item_matrix(CSV_path: str = "", y: str = "keywords", x: str = "title", keyword_length: int = 3, number_of_records: int = "", delimiter: str = ", ", separator: str = ";") -> tuple[pd.DataFrame, list]:
     """
     Generate a boolean matrix of items by respective tag presence from a csv.
 
@@ -30,7 +30,7 @@ def generate_binary_item_matrix(CSV_path: str = "", y: str = "keywords", x: str 
 
     rows_list (list): List of article identifyers.
     """
-    dimensions = pd.read_csv(CSV_path)[y]
+    dimensions = pd.read_csv(CSV_path, sep = separator)[y]
     if number_of_records:
         dimensions = dimensions.head(number_of_records)
         
@@ -40,7 +40,7 @@ def generate_binary_item_matrix(CSV_path: str = "", y: str = "keywords", x: str 
     dimensions_uniques = sorted(set(dimensions))
     dimensions_filtered = [
         item for item in dimensions_uniques if len(item) >= keyword_length]
-    rows = pd.read_csv(CSV_path)[x]
+    rows = pd.read_csv(CSV_path, sep = separator)[x]
     rows_list = rows.tolist()
     binary_matrix = np.zeros((len(rows), len(dimensions_filtered)), dtype=int)
 
